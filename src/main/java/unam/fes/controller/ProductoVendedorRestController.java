@@ -5,10 +5,13 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import unam.fes.entity.producto.Producto;
 import unam.fes.entity.proven.ProductoVendedor;
+import unam.fes.entity.vendedor.Vendedor;
 import unam.fes.entity.venta.InventarioResponseDTO;
+import unam.fes.repository.VendedorRepository;
 import unam.fes.service.ProductoVendedorService;
 
 import java.math.BigDecimal;
+import java.security.Principal;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -17,9 +20,11 @@ import java.util.stream.Collectors;
 public class ProductoVendedorRestController {
 
     private final ProductoVendedorService productoVendedorService;
+    private final VendedorRepository vendedorRepository;
 
-    public ProductoVendedorRestController(ProductoVendedorService productoVendedorService) {
+    public ProductoVendedorRestController(ProductoVendedorService productoVendedorService, VendedorRepository vendedorRepository) {
         this.productoVendedorService = productoVendedorService;
+        this.vendedorRepository = vendedorRepository;
     }
 
     // 1. GET: Catálogo disponible para el vendedor (según su bloque)
@@ -56,8 +61,14 @@ public class ProductoVendedorRestController {
 
     // 3. POST: Asignar un producto al inventario del vendedor y fijarle un precio
     @PostMapping
-    public ResponseEntity<String> asignarProducto(@RequestBody AsignarProductoDTO request) {
+    public ResponseEntity<String> asignarProducto(@RequestBody AsignarProductoDTO request, Principal principal) {
         try {
+
+            Vendedor vendedor = vendedorRepository.findByUsuario_Username(principal.getName()).orElseThrow(() ->
+                    new IllegalArgumentException(
+                            "No se encontro ningún usuario con ese nombre de usuario"
+                    ));
+
             productoVendedorService.asignarProducto(
                     request.getIdVendedor(),
                     request.getIdProducto(),
