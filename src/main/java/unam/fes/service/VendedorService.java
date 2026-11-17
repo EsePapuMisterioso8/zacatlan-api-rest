@@ -2,7 +2,6 @@
 package unam.fes.service;
 
 import jakarta.transaction.Transactional;
-//import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import unam.fes.entity.bloque.Bloque;
@@ -45,24 +44,19 @@ public class VendedorService {
             String username,
             String password) {
 
-        // Validar datos personales
         nombre = validarNombre(nombre, "El nombre");
         apellido = validarNombre(apellido, "El apellido");
 
-        // Validar teléfono
         if (telefono == null || !telefono.matches("[0-9]{10}")) {
             throw new IllegalArgumentException(
                     "El teléfono debe contener exactamente 10 dígitos");
         }
 
-        // Comprobar que el teléfono no esté registrado
         if (vendedorRepository.existsByTelefono(telefono)) {
             throw new IllegalArgumentException(
-                    "Ese número de teléfono ya está registrado"
-            );
+                    "Ese número de teléfono ya está registrado");
         }
 
-        // Validar nombre de usuario
         if (username == null || username.isBlank()) {
             throw new IllegalArgumentException(
                     "El nombre de usuario es obligatorio");
@@ -81,7 +75,6 @@ public class VendedorService {
                     "Ese nombre de usuario ya está registrado o solicitado");
         }
 
-        // Validar contraseña
         if (password == null || password.length() < 8
                 || password.length() > 72
                 || password.chars().anyMatch(Character::isWhitespace)) {
@@ -90,7 +83,6 @@ public class VendedorService {
                     "La contraseña debe tener entre 8 y 72 caracteres y no contener espacios");
         }
 
-        // BCrypt admite un máximo de 72 bytes
         int bytesPassword = password.getBytes(
                 StandardCharsets.UTF_8).length;
 
@@ -99,7 +91,6 @@ public class VendedorService {
                     "La contraseña supera el límite permitido por el sistema");
         }
 
-        // Validar bloque
         if (idBloque == null || idBloque <= 0) {
             throw new IllegalArgumentException(
                     "Debes seleccionar un bloque válido");
@@ -107,15 +98,13 @@ public class VendedorService {
 
         Bloque bloque = bloqueRepository.findById(idBloque)
                 .orElseThrow(() ->
-                        new IllegalArgumentException(
-                                "El bloque no existe"));
+                        new IllegalArgumentException("El bloque no existe"));
 
         if (!Boolean.TRUE.equals(bloque.getActivo())) {
             throw new IllegalArgumentException(
                     "El bloque no está disponible");
         }
 
-        // Comprobar nombre de usuario duplicado
         if (usuarioRepository.existsByUsername(username)
                 || vendedorRepository.existsByUsernameSolicitado(username)) {
 
@@ -123,7 +112,6 @@ public class VendedorService {
                     "Ese nombre de usuario ya está registrado");
         }
 
-        // Crear solicitud pendiente
         Vendedor vendedor = Vendedor.builder()
                 .nombre(nombre)
                 .apellido(apellido)
@@ -191,7 +179,6 @@ public class VendedorService {
                     "El nombre de usuario ya está registrado");
         }
 
-        // Crear cuenta del vendedor
         Usuario usuario = Usuario.builder()
                 .username(username)
                 .password(passwordCifrada)
@@ -207,7 +194,6 @@ public class VendedorService {
         vendedor.setActivo(true);
         vendedor.setFechaAlta(LocalDateTime.now());
 
-        // Eliminar credenciales temporales
         vendedor.setUsernameSolicitado(null);
         vendedor.setPasswordSolicitado(null);
 
@@ -231,9 +217,52 @@ public class VendedorService {
         vendedor.setEstadoSolicitud("RECHAZADA");
         vendedor.setActivo(false);
 
-        // Eliminar credenciales temporales
         vendedor.setUsernameSolicitado(null);
         vendedor.setPasswordSolicitado(null);
+
+        return vendedorRepository.save(vendedor);
+    }
+
+    // Modificar datos personales del vendedor
+    @Transactional
+    public Vendedor modificarDatosVendedor(
+            Long idVendedor,
+            String nombre,
+            String apellido,
+            String telefono) {
+
+        Vendedor vendedor = vendedorRepository.findById(idVendedor)
+                .orElseThrow(() ->
+                        new IllegalArgumentException(
+                                "No se encontró el vendedor"));
+
+        if (!"APROBADA".equals(vendedor.getEstadoSolicitud())) {
+            throw new IllegalArgumentException(
+                    "Solo se pueden modificar vendedores aprobados");
+        }
+
+        nombre = validarNombre(nombre, "El nombre");
+        apellido = validarNombre(apellido, "El apellido");
+
+        if (telefono == null || !telefono.matches("[0-9]{10}")) {
+            throw new IllegalArgumentException(
+                    "El teléfono debe contener exactamente 10 dígitos");
+        }
+
+        boolean telefonoUsado = vendedorRepository.findAll()
+                .stream()
+                .anyMatch(otro ->
+                        !otro.getId().equals(idVendedor)
+                                && telefono.equals(otro.getTelefono()));
+
+        if (telefonoUsado) {
+            throw new IllegalArgumentException(
+                    "Ese número de teléfono ya está registrado por otro vendedor");
+        }
+
+        vendedor.setNombre(nombre);
+        vendedor.setApellido(apellido);
+        vendedor.setTelefono(telefono);
 
         return vendedorRepository.save(vendedor);
     }

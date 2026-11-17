@@ -1,3 +1,4 @@
+
 package unam.fes.controller;
 
 import org.springframework.http.HttpStatus;
@@ -8,15 +9,17 @@ import unam.fes.service.VendedorService;
 @RestController
 @RequestMapping("/api/vendedores")
 public class VendedorRestController {
+
     private final VendedorService vendedorService;
 
     public VendedorRestController(VendedorService vendedorService) {
         this.vendedorService = vendedorService;
     }
 
-    //Registrar solicitud
+    // Registrar solicitud
     @PostMapping("/registro")
-    public ResponseEntity<String> registrar(@RequestBody RegistroRequestDTO request){
+    public ResponseEntity<String> registrar(
+            @RequestBody RegistroRequestDTO request) {
         try {
             vendedorService.registrarSolicitud(
                     request.getNombre(),
@@ -26,52 +29,105 @@ public class VendedorRestController {
                     request.getUsername(),
                     request.getPassword()
             );
-            return new ResponseEntity<>("Solicitud registrada exitosamente. Esperando aprobación", HttpStatus.CREATED);
-        } catch (IllegalArgumentException e){
-            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
+
+            return new ResponseEntity<>(
+                    "Solicitud registrada exitosamente. Esperando aprobación",
+                    HttpStatus.CREATED
+            );
+        } catch (IllegalArgumentException e) {
+            return new ResponseEntity<>(
+                    e.getMessage(), HttpStatus.BAD_REQUEST
+            );
         }
     }
 
-    //Para aprobar la solicitud (solo para el admin)
+    // Aprobar solicitud
     @PutMapping("/{id}/aprobar")
-    public ResponseEntity<String> aprobar(@PathVariable Long id){
+    public ResponseEntity<String> aprobar(@PathVariable Long id) {
         try {
             vendedorService.aprobarSolicitud(id);
-            return new ResponseEntity<>("Solicitud aprobada y usuario creado exitosamente", HttpStatus.OK);
-        } catch (IllegalArgumentException e){
-            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
+
+            return new ResponseEntity<>(
+                    "Solicitud aprobada y usuario creado exitosamente",
+                    HttpStatus.OK
+            );
+        } catch (IllegalArgumentException e) {
+            return new ResponseEntity<>(
+                    e.getMessage(), HttpStatus.BAD_REQUEST
+            );
         }
     }
 
-    //Para rechazar la solicitud
+    // Rechazar solicitud
     @PutMapping("/{id}/rechazar")
-    public ResponseEntity<String> rechazar(@PathVariable Long id){
+    public ResponseEntity<String> rechazar(@PathVariable Long id) {
         try {
             vendedorService.rechazarSolicitud(id);
-            return new ResponseEntity<>("Solicitud rechazada", HttpStatus.OK);
-        } catch (IllegalArgumentException e){
-            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
+
+            return new ResponseEntity<>(
+                    "Solicitud rechazada", HttpStatus.OK
+            );
+        } catch (IllegalArgumentException e) {
+            return new ResponseEntity<>(
+                    e.getMessage(), HttpStatus.BAD_REQUEST
+            );
         }
     }
 
-    //Para activar o desactivar vendedor
+    // Activar o desactivar vendedor
     @PutMapping("/{id}/estado")
-    public ResponseEntity<String> cambiarEstado(@PathVariable Long id, @RequestParam boolean activar){
+    public ResponseEntity<String> cambiarEstado(
+            @PathVariable Long id,
+            @RequestParam boolean activar) {
         try {
-            if (activar){
+            if (activar) {
                 vendedorService.activarVendedor(id);
-                return new ResponseEntity<>("Vendedor activado exitosamente", HttpStatus.OK);
+
+                return new ResponseEntity<>(
+                        "Vendedor activado exitosamente",
+                        HttpStatus.OK
+                );
             } else {
                 vendedorService.desactivarVendedor(id);
-                return new ResponseEntity<>("Vendedor desactivado exitosamente", HttpStatus.OK);
+
+                return new ResponseEntity<>(
+                        "Vendedor desactivado exitosamente",
+                        HttpStatus.OK
+                );
             }
-        } catch (IllegalArgumentException e){
-            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
+        } catch (IllegalArgumentException e) {
+            return new ResponseEntity<>(
+                    e.getMessage(), HttpStatus.BAD_REQUEST
+            );
         }
     }
 
+    // Modificar únicamente nombre, apellido y teléfono
+    @PutMapping("/{id}")
+    public ResponseEntity<String> modificarDatos(
+            @PathVariable Long id,
+            @RequestBody ModificarVendedorDTO request) {
+        try {
+            vendedorService.modificarDatosVendedor(
+                    id,
+                    request.getNombre(),
+                    request.getApellido(),
+                    request.getTelefono()
+            );
+
+            return new ResponseEntity<>(
+                    "Datos del vendedor modificados exitosamente",
+                    HttpStatus.OK
+            );
+        } catch (IllegalArgumentException e) {
+            return new ResponseEntity<>(
+                    e.getMessage(), HttpStatus.BAD_REQUEST
+            );
+        }
+    }
 
     public static class RegistroRequestDTO {
+
         private String nombre;
         private String apellido;
         private String telefono;
@@ -79,7 +135,6 @@ public class VendedorRestController {
         private String username;
         private String password;
 
-        // Getters
         public String getNombre() { return nombre; }
         public String getApellido() { return apellido; }
         public String getTelefono() { return telefono; }
@@ -87,12 +142,59 @@ public class VendedorRestController {
         public String getUsername() { return username; }
         public String getPassword() { return password; }
 
-        // Setters
-        public void setNombre(String nombre) { this.nombre = nombre; }
-        public void setApellido(String apellido) { this.apellido = apellido; }
-        public void setTelefono(String telefono) { this.telefono = telefono; }
-        public void setIdBloque(Long idBloque) { this.idBloque = idBloque; }
-        public void setUsername(String username) { this.username = username; }
-        public void setPassword(String password) { this.password = password; }
+        public void setNombre(String nombre) {
+            this.nombre = nombre;
+        }
+
+        public void setApellido(String apellido) {
+            this.apellido = apellido;
+        }
+
+        public void setTelefono(String telefono) {
+            this.telefono = telefono;
+        }
+
+        public void setIdBloque(Long idBloque) {
+            this.idBloque = idBloque;
+        }
+
+        public void setUsername(String username) {
+            this.username = username;
+        }
+
+        public void setPassword(String password) {
+            this.password = password;
+        }
+    }
+
+    public static class ModificarVendedorDTO {
+
+        private String nombre;
+        private String apellido;
+        private String telefono;
+
+        public String getNombre() {
+            return nombre;
+        }
+
+        public String getApellido() {
+            return apellido;
+        }
+
+        public String getTelefono() {
+            return telefono;
+        }
+
+        public void setNombre(String nombre) {
+            this.nombre = nombre;
+        }
+
+        public void setApellido(String apellido) {
+            this.apellido = apellido;
+        }
+
+        public void setTelefono(String telefono) {
+            this.telefono = telefono;
+        }
     }
 }

@@ -13,7 +13,6 @@ import unam.fes.entity.vendedor.Vendedor;
 import unam.fes.repository.VendedorRepository;
 import unam.fes.service.VentaService;
 
-import java.math.BigDecimal;
 import java.security.Principal;
 import java.time.LocalDate;
 import java.util.List;
@@ -56,7 +55,6 @@ public class VentaRestController {
             Principal principal) {
 
         try {
-            // Obtener al vendedor mediante el usuario autenticado
             Vendedor vendedor = vendedorRepository
                     .findByUsuario_Username(principal.getName())
                     .orElseThrow(() ->
@@ -64,7 +62,6 @@ public class VentaRestController {
                                     "No se encontró un vendedor asociado al usuario."
                             ));
 
-            // Registrar la venta con el vendedor autenticado
             Venta nuevaVenta = ventaService.registrarVenta(
                     vendedor.getId(),
                     request.getItems()
@@ -96,17 +93,17 @@ public class VentaRestController {
         return new ResponseEntity<>(respuesta, HttpStatus.OK);
     }
 
-    // 3. GET: Listar ventas de un vendedor específico
+    // 3. GET: Listar ventas del vendedor autenticado
     @GetMapping("/vendedor")
-    public ResponseEntity<?> listarPorVendedor(
-            Principal principal) {
+    public ResponseEntity<?> listarPorVendedor(Principal principal) {
 
         try {
-
-            Vendedor vendedor = vendedorRepository.findByUsuario_Username(principal.getName())
+            Vendedor vendedor = vendedorRepository
+                    .findByUsuario_Username(principal.getName())
                     .orElseThrow(() -> new IllegalArgumentException(
-                            "No se encontro al vendedor auntentificado"
+                            "No se encontró al vendedor autenticado"
                     ));
+
             List<VentaResponseDTO> respuesta =
                     ventaService.listarVentasVendedor(vendedor.getId())
                             .stream()
@@ -114,18 +111,23 @@ public class VentaRestController {
                             .collect(Collectors.toList());
 
             return new ResponseEntity<>(respuesta, HttpStatus.OK);
-        }catch (IllegalArgumentException e){
+
+        } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
-
     }
 
     // 4. GET: Listar ventas de un día específico
     @GetMapping("/dia")
-    public ResponseEntity<List<VentaResponseDTO>> listarPorDia(
+    public ResponseEntity<?> listarPorDia(
             @RequestParam
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
             LocalDate fecha) {
+
+        if (fecha.isAfter(LocalDate.now())) {
+            return ResponseEntity.badRequest()
+                    .body("No se pueden consultar ventas de fechas futuras.");
+        }
 
         List<VentaResponseDTO> respuesta =
                 ventaService.listarVentasPorDia(fecha)
@@ -142,6 +144,11 @@ public class VentaRestController {
             @RequestParam
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
             LocalDate fecha) {
+
+        if (fecha.isAfter(LocalDate.now())) {
+            return ResponseEntity.badRequest()
+                    .body("No se pueden consultar totales de fechas futuras.");
+        }
 
         return new ResponseEntity<>(
                 ventaService.calcularVentasPorVendedor(fecha),
@@ -160,14 +167,17 @@ public class VentaRestController {
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
             LocalDate fechaFin) {
 
-        try {
-            if (fechaInicio.isAfter(fechaFin)) {
-                return new ResponseEntity<>(
-                        "La fecha de inicio no puede ser posterior a la fecha final.",
-                        HttpStatus.BAD_REQUEST
-                );
-            }
+        if (fechaInicio.isAfter(fechaFin)) {
+            return ResponseEntity.badRequest()
+                    .body("La fecha de inicio no puede ser posterior a la fecha final.");
+        }
 
+        if (fechaFin.isAfter(LocalDate.now())) {
+            return ResponseEntity.badRequest()
+                    .body("No se pueden consultar rangos que incluyan fechas futuras.");
+        }
+
+        try {
             List<VentaResponseDTO> respuesta =
                     ventaService.listarVentasPorRango(fechaInicio, fechaFin)
                             .stream()
