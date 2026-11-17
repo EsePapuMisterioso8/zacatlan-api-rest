@@ -17,16 +17,18 @@ public class SolicitudCambioPrecioService {
 
     private final SolicitudCambioPrecioRepository solicitudRepository;
     private final ProductoVendedorRepository productoVendedorRepository;
+    private final HistorialMovimientosService historialService;
 
     public SolicitudCambioPrecioService(
             SolicitudCambioPrecioRepository solicitudRepository,
-            ProductoVendedorRepository productoVendedorRepository) {
+            ProductoVendedorRepository productoVendedorRepository,
+            HistorialMovimientosService historialService) {
 
         this.solicitudRepository = solicitudRepository;
         this.productoVendedorRepository = productoVendedorRepository;
+        this.historialService = historialService;
     }
 
-    // Registrar una solicitud de cambio de precio
     @Transactional
     public void solicitarCambioPrecio(
             Long idVendedor,
@@ -94,21 +96,21 @@ public class SolicitudCambioPrecioService {
         solicitudRepository.save(solicitud);
     }
 
-    // Consultar las solicitudes de un vendedor
     public List<SolicitudCambioPrecio> listarSolicitudesVendedor(Long idVendedor) {
         return solicitudRepository.findByProductoVendedorVendedorId(idVendedor);
     }
 
-    // Consultar todas las solicitudes pendientes
     public List<SolicitudCambioPrecio> listarSolicitudesPendientes() {
         return solicitudRepository.findByEstado(
                 SolicitudCambioPrecio.EstadoSolicitud.PENDIENTE
         );
     }
 
-    // Autorizar una solicitud y aplicar el nuevo precio
     @Transactional
-    public void autorizarSolicitud(Long idSolicitud, String observacion) {
+    public void autorizarSolicitud(
+            Long idSolicitud,
+            String observacion,
+            String usernameAdministrador) {
 
         SolicitudCambioPrecio solicitud = solicitudRepository.findById(idSolicitud)
                 .orElseThrow(() -> new IllegalArgumentException(
@@ -132,22 +134,37 @@ public class SolicitudCambioPrecioService {
                     "No se puede autorizar el cambio porque el producto no tiene un precio actual válido.");
         }
 
-        // Actualizar automáticamente el precio
-        productoVendedor.setPrecio(solicitud.getPrecioSolicitado());
+        BigDecimal precioAnterior = productoVendedor.getPrecio();
+        BigDecimal precioNuevo = solicitud.getPrecioSolicitado();
 
+        productoVendedor.setPrecio(precioNuevo);
         productoVendedorRepository.save(productoVendedor);
 
-        // Marcar la solicitud como aplicada
         solicitud.setEstado(SolicitudCambioPrecio.EstadoSolicitud.APLICADA);
         solicitud.setFechaRespuesta(LocalDateTime.now());
         solicitud.setObservacionAdmin(observacion);
 
         solicitudRepository.save(solicitud);
+
+        historialService.registrarMovimiento(
+                usernameAdministrador,
+                "AUTORIZACION",
+                "CAMBIO_PRECIO",
+                solicitud.getId(),
+                "Se autorizó el cambio de precio de "
+                        + productoVendedor.getProducto().getNombre(),
+                "Precio anterior: $" + precioAnterior.toPlainString(),
+                "Precio nuevo: $" + precioNuevo.toPlainString()
+                        + ". Observación: "
+                        + (observacion == null ? "Sin observación" : observacion)
+        );
     }
 
-    // Rechazar una solicitud
     @Transactional
-    public void rechazarSolicitud(Long idSolicitud, String observacion) {
+    public void rechazarSolicitud(
+            Long idSolicitud,
+            String observacion,
+            String usernameAdministrador) {
 
         SolicitudCambioPrecio solicitud = solicitudRepository.findById(idSolicitud)
                 .orElseThrow(() -> new IllegalArgumentException(
@@ -158,10 +175,29 @@ public class SolicitudCambioPrecioService {
                     "Esta solicitud ya fue atendida.");
         }
 
+        ProductoVendedor productoVendedor = solicitud.getProductoVendedor();
+
+        BigDecimal precioActual = productoVendedor.getPrecio();
+
         solicitud.setEstado(SolicitudCambioPrecio.EstadoSolicitud.RECHAZADA);
         solicitud.setFechaRespuesta(LocalDateTime.now());
         solicitud.setObservacionAdmin(observacion);
 
         solicitudRepository.save(solicitud);
+
+        historialService.registrarMovimiento(
+                usernameAdministrador,
+                "RECHAZO",
+                "CAMBIO_PRECIO",
+                solicitud.getId(),
+                "Se rechazó el cambio de precio de "
+                        + productoVendedor.getProducto().getNombre(),
+                "Precio actual: $"
+                        + (precioActual == null ? "No disponible" : precioActual.toPlainString()),
+                "Precio sin cambios. Precio solicitado: $"
+                        + solicitud.getPrecioSolicitado().toPlainString()
+                        + ". Observación: "
+                        + (observacion == null ? "Sin observación" : observacion)
+        );
     }
 }

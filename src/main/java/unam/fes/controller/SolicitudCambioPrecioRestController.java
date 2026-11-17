@@ -97,23 +97,48 @@ public class SolicitudCambioPrecioRestController {
         return new ResponseEntity<>(respuesta, HttpStatus.OK);
     }
 
-    // 4. PUT: Autorizar solicitud (Y actualizar el precio automáticamente)
+
     @PutMapping("/{idSolicitud}/autorizar")
-    public ResponseEntity<?> autorizar(@PathVariable Long idSolicitud, @RequestBody ResolucionDTO request) {
+    public ResponseEntity<?> autorizar(
+            @PathVariable Long idSolicitud,
+            @RequestBody ResolucionDTO request,
+            Principal principal) {
+
         try {
-            solicitudService.autorizarSolicitud(idSolicitud, request.getObservacion());
-            return new ResponseEntity<>("Solicitud AUTORIZADA y precio actualizado.", HttpStatus.OK);
+            solicitudService.autorizarSolicitud(
+                    idSolicitud,
+                    request.getObservacion(),
+                    principal.getName()
+            );
+
+            return new ResponseEntity<>(
+                    "Solicitud AUTORIZADA y precio actualizado.",
+                    HttpStatus.OK
+            );
+
         } catch (IllegalArgumentException e) {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
         }
     }
 
-    // 5. PUT: Rechazar solicitud
     @PutMapping("/{idSolicitud}/rechazar")
-    public ResponseEntity<?> rechazar(@PathVariable Long idSolicitud, @RequestBody ResolucionDTO request) {
+    public ResponseEntity<?> rechazar(
+            @PathVariable Long idSolicitud,
+            @RequestBody ResolucionDTO request,
+            Principal principal) {
+
         try {
-            solicitudService.rechazarSolicitud(idSolicitud, request.getObservacion());
-            return new ResponseEntity<>("Solicitud RECHAZADA.", HttpStatus.OK);
+            solicitudService.rechazarSolicitud(
+                    idSolicitud,
+                    request.getObservacion(),
+                    principal.getName()
+            );
+
+            return new ResponseEntity<>(
+                    "Solicitud RECHAZADA.",
+                    HttpStatus.OK
+            );
+
         } catch (IllegalArgumentException e) {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
         }
