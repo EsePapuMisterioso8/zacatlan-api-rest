@@ -4,11 +4,13 @@ package unam.fes.controller;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import unam.fes.entity.venta.Venta;
 import unam.fes.entity.venta.VentaRequestDTO;
 import unam.fes.entity.venta.VentaResponseDTO;
+import unam.fes.entity.venta.VentaDetalleResponseDTO;
 import unam.fes.entity.vendedor.Vendedor;
 import unam.fes.repository.VendedorRepository;
 import unam.fes.service.VentaService;
@@ -117,7 +119,43 @@ public class VentaRestController {
         }
     }
 
-    // 4. GET: Listar ventas de un día específico
+    // 4. GET: Consultar una venta por ID con sus detalles
+    @GetMapping("/{id}")
+    public ResponseEntity<?> obtenerPorId(
+            @PathVariable Long id,
+            Authentication authentication) {
+
+        try {
+            VentaDetalleResponseDTO detalle =
+                    ventaService.obtenerDetalleVenta(id);
+
+            boolean esAdmin = authentication.getAuthorities().stream()
+                    .anyMatch(a ->
+                            a.getAuthority().equals("ADMINISTRADOR")
+                                    || a.getAuthority().equals("ROLE_ADMINISTRADOR")
+                    );
+
+            if (!esAdmin) {
+                Vendedor vendedor = vendedorRepository
+                        .findByUsuario_Username(authentication.getName())
+                        .orElse(null);
+
+                if (vendedor == null
+                        || !vendedor.getId().equals(detalle.getIdVendedor())) {
+                    return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                            .body("No tienes permiso para consultar esta venta.");
+                }
+            }
+
+            return ResponseEntity.ok(detalle);
+
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(e.getMessage());
+        }
+    }
+
+    // 5. GET: Listar ventas de un día específico
     @GetMapping("/dia")
     public ResponseEntity<?> listarPorDia(
             @RequestParam
@@ -138,7 +176,7 @@ public class VentaRestController {
         return new ResponseEntity<>(respuesta, HttpStatus.OK);
     }
 
-    // 5. GET: Obtener el total vendido por cada vendedor en un día
+    // 6. GET: Obtener el total vendido por cada vendedor en un día
     @GetMapping("/totales")
     public ResponseEntity<?> totalesPorVendedor(
             @RequestParam
@@ -156,7 +194,7 @@ public class VentaRestController {
         );
     }
 
-    // 6. GET: Listar ventas por rango de fechas
+    // 7. GET: Listar ventas por rango de fechas
     @GetMapping("/rango")
     public ResponseEntity<?> listarPorRango(
             @RequestParam

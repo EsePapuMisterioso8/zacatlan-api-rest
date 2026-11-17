@@ -91,7 +91,7 @@ public class ProductoVendedorRestController {
 
             Vendedor vendedor = vendedorRepository.findByUsuario_Username(principal.getName()).orElseThrow(() ->
                     new IllegalArgumentException(
-                            "No se encontro ningún usuario con ese nombre de usuario"
+                            "No se encontro ningún usuario con ese   nombre de usuario"
                     ));
 
             if(request.getIdProducto() == null || request.getPrecio() == null){

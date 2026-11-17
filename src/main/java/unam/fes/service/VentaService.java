@@ -8,6 +8,7 @@ import unam.fes.entity.proven.ProductoVendedor;
 import unam.fes.entity.vendedor.Vendedor;
 import unam.fes.entity.venta.Venta;
 import unam.fes.entity.venta.VentaRequestDTO;
+import unam.fes.entity.venta.VentaDetalleResponseDTO;
 import unam.fes.repository.DetalleVentaRepository;
 import unam.fes.repository.ProductoVendedorRepository;
 import unam.fes.repository.VendedorRepository;
@@ -60,7 +61,7 @@ public class VentaService {
                 .fechaHora(LocalDateTime.now())
                 .total(BigDecimal.ZERO)
                 .metodoPago("EFECTIVO")
-                .estado("COMPLETADA") // <- Como la creamos completada, ya no se puede modificar
+                .estado("COMPLETADA")
                 .detalles(new ArrayList<>())
                 .build();
 
@@ -81,13 +82,15 @@ public class VentaService {
                 throw new IllegalArgumentException("No puedes vender productos de otro vendedor.");
             }
 
-            if (!Boolean.TRUE.equals(productoVendedor.getActivo()) || !Boolean.TRUE.equals(productoVendedor.getProducto().getActivo())) {
+            if (!Boolean.TRUE.equals(productoVendedor.getActivo())
+                    || !Boolean.TRUE.equals(productoVendedor.getProducto().getActivo())) {
                 throw new IllegalArgumentException("Uno de los productos está inactivo.");
             }
 
-            // LÓGICA DE REGATEO:
-            // Si el vendedor mandó un precio personalizado válido, lo usamos. Si no, tomamos el precio base de su inventario.
-            BigDecimal precioFinal = (item.getPrecioVenta() != null && item.getPrecioVenta().compareTo(BigDecimal.ZERO) > 0)
+            // Si se envía un precio personalizado válido, se utiliza.
+            // De lo contrario, se toma el precio habitual del inventario.
+            BigDecimal precioFinal = (item.getPrecioVenta() != null
+                    && item.getPrecioVenta().compareTo(BigDecimal.ZERO) > 0)
                     ? item.getPrecioVenta()
                     : productoVendedor.getPrecio();
 
@@ -97,7 +100,7 @@ public class VentaService {
                     .venta(venta)
                     .productoVendedor(productoVendedor)
                     .cantidad(cantidad)
-                    .precioUnitario(precioFinal) // Guardamos el precio exacto al que se vendió
+                    .precioUnitario(precioFinal)
                     .subTotal(subtotal)
                     .build();
 
@@ -112,94 +115,15 @@ public class VentaService {
         return ventaGuardada;
     }
 
-    /*@Transactional
+    /*
+    @Transactional
     public Venta registrarVenta(
             Long idVendedor,
             Map<Long, Integer> productosCantidad) {
 
-        if (productosCantidad == null || productosCantidad.isEmpty()) {
-            throw new IllegalArgumentException(
-                    "Debes seleccionar al menos un producto.");
-        }
-
-        Vendedor vendedor = vendedorRepository.findById(idVendedor)
-                .orElseThrow(() -> new IllegalArgumentException(
-                        "El vendedor no existe."));
-
-        if (!Boolean.TRUE.equals(vendedor.getActivo())) {
-            throw new IllegalArgumentException(
-                    "El vendedor está inactivo.");
-        }
-
-        Venta venta = Venta.builder()
-                .vendedor(vendedor)
-                .fechaHora(LocalDateTime.now())
-                .total(BigDecimal.ZERO)
-                .metodoPago("EFECTIVO")
-                .estado("COMPLETADA")
-                .detalles(new ArrayList<>())
-                .build();
-
-        BigDecimal total = BigDecimal.ZERO;
-
-        for (Map.Entry<Long, Integer> entrada : productosCantidad.entrySet()) {
-
-            Long idProductoVendedor = entrada.getKey();
-            Integer cantidad = entrada.getValue();
-
-            if (cantidad == null || cantidad <= 0) {
-                throw new IllegalArgumentException(
-                        "Las cantidades deben ser mayores que cero.");
-            }
-
-            ProductoVendedor productoVendedor =
-                    productoVendedorRepository.findById(idProductoVendedor)
-                            .orElseThrow(() -> new IllegalArgumentException(
-                                    "Uno de los productos no existe."));
-
-            if (!productoVendedor.getVendedor().getId().equals(idVendedor)) {
-                throw new IllegalArgumentException(
-                        "No puedes vender productos de otro vendedor.");
-            }
-
-            if (!Boolean.TRUE.equals(productoVendedor.getActivo())
-                    || !Boolean.TRUE.equals(
-                    productoVendedor.getProducto().getActivo())) {
-                throw new IllegalArgumentException(
-                        "Uno de los productos está inactivo.");
-            }
-
-            BigDecimal precio = productoVendedor.getPrecio();
-
-            if (precio == null
-                    || precio.compareTo(BigDecimal.ZERO) <= 0) {
-                throw new IllegalArgumentException(
-                        "El producto tiene un precio inválido.");
-            }
-
-            BigDecimal subtotal = precio.multiply(
-                    BigDecimal.valueOf(cantidad));
-
-            DetalleVenta detalle = DetalleVenta.builder()
-                    .venta(venta)
-                    .productoVendedor(productoVendedor)
-                    .cantidad(cantidad)
-                    .precioUnitario(precio)
-                    .subTotal(subtotal)
-                    .build();
-
-            venta.getDetalles().add(detalle);
-            total = total.add(subtotal);
-        }
-
-        venta.setTotal(total);
-
-        Venta ventaGuardada = ventaRepository.save(venta);
-
-        detalleVentaRepository.saveAll(ventaGuardada.getDetalles());
-
-        return ventaGuardada;
-    }*/
+        // Implementación anterior conservada como referencia.
+    }
+    */
 
     public List<Venta> listarVentasVendedor(Long idVendedor) {
         return ventaRepository.findByVendedorIdOrderByFechaHoraDesc(idVendedor);
@@ -207,6 +131,36 @@ public class VentaService {
 
     public List<Venta> listarTodasLasVentas() {
         return ventaRepository.findAllByOrderByFechaHoraDesc();
+    }
+
+    // Consultar una venta por ID incluyendo sus detalles.
+    @Transactional(readOnly = true)
+    public VentaDetalleResponseDTO obtenerDetalleVenta(Long idVenta) {
+
+        Venta venta = ventaRepository.findById(idVenta)
+                .orElseThrow(() -> new IllegalArgumentException("La venta no existe."));
+
+        List<DetalleVenta> detalles = detalleVentaRepository.findByVentaId(idVenta);
+
+        List<VentaDetalleResponseDTO.ItemDetalleDTO> items = detalles.stream()
+                .map(detalle -> VentaDetalleResponseDTO.ItemDetalleDTO.builder()
+                        .nombreProducto(detalle.getProductoVendedor().getProducto().getNombre())
+                        .cantidad(detalle.getCantidad())
+                        .precioUnitario(detalle.getPrecioUnitario())
+                        .subTotal(detalle.getSubTotal())
+                        .build())
+                .toList();
+
+        return VentaDetalleResponseDTO.builder()
+                .idVenta(venta.getId())
+                .nombreVendedor(venta.getVendedor().getNombre() + " " + venta.getVendedor().getApellido())
+                .fechaHora(venta.getFechaHora())
+                .total(venta.getTotal())
+                .metodoPago(venta.getMetodoPago())
+                .estado(venta.getEstado())
+                .idVendedor(venta.getVendedor().getId())
+                .detalles(items)
+                .build();
     }
 
     public List<Venta> listarVentasPorDia(LocalDate fecha) {
@@ -228,9 +182,7 @@ public class VentaService {
         Map<String, BigDecimal> totales = new LinkedHashMap<>();
 
         for (Venta venta : ventas) {
-
             Vendedor vendedor = venta.getVendedor();
-
             String nombre = vendedor.getNombre() + " " + vendedor.getApellido();
 
             totales.merge(nombre, venta.getTotal(), BigDecimal::add);
@@ -239,13 +191,10 @@ public class VentaService {
         return totales;
     }
 
-    //Metodo para consultar ventas por rango de fecha
+    // Método para consultar ventas por rango de fecha.
     public List<Venta> listarVentasPorRango(LocalDate fechaInicio, LocalDate fechaFin) {
-        // El inicio es a las 00:00:00 del primer día
-        LocalDateTime inicio = fechaInicio.atStartOfDay();
 
-        // El fin es a las 00:00:00 del día SIGUIENTE a la fecha de corte,
-        // para incluir todo el día final completo.
+        LocalDateTime inicio = fechaInicio.atStartOfDay();
         LocalDateTime fin = fechaFin.plusDays(1).atStartOfDay();
 
         return ventaRepository
