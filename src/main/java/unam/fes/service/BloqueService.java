@@ -1,148 +1,148 @@
 
-package unam.fes.service;
+    package unam.fes.service;
 
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import unam.fes.entity.bloque.Bloque;
-import unam.fes.repository.BloqueRepository;
-import unam.fes.repository.ProductoRepository;
-import unam.fes.repository.VendedorRepository;
+    import org.springframework.stereotype.Service;
+    import org.springframework.transaction.annotation.Transactional;
+    import unam.fes.entity.bloque.Bloque;
+    import unam.fes.repository.BloqueRepository;
+    import unam.fes.repository.ProductoRepository;
+    import unam.fes.repository.VendedorRepository;
 
-import java.util.List;
+    import java.util.List;
 
-@Service
-public class BloqueService {
+    @Service
+    public class BloqueService {
 
-    private final BloqueRepository bloqueRepository;
-    private final VendedorRepository vendedorRepository;
-    private final ProductoRepository productoRepository;
-    private final HistorialMovimientosService historialService;
+        private final BloqueRepository bloqueRepository;
+        private final VendedorRepository vendedorRepository;
+        private final ProductoRepository productoRepository;
+        private final HistorialMovimientosService historialService;
 
-    public BloqueService(
-            BloqueRepository bloqueRepository,
-            VendedorRepository vendedorRepository,
-            ProductoRepository productoRepository,
-            HistorialMovimientosService historialService) {
+        public BloqueService(
+                BloqueRepository bloqueRepository,
+                VendedorRepository vendedorRepository,
+                ProductoRepository productoRepository,
+                HistorialMovimientosService historialService) {
 
-        this.bloqueRepository = bloqueRepository;
-        this.vendedorRepository = vendedorRepository;
-        this.productoRepository = productoRepository;
-        this.historialService = historialService;
-    }
-
-    // Listar todos los bloques
-    public List<Bloque> listarTodos() {
-        return bloqueRepository.findAll();
-    }
-
-    // Crear un bloque nuevo
-    @Transactional
-    public void crearBloque(
-            String nombre,
-            String descripcion,
-            String usernameAdministrador) {
-
-        if (nombre == null || nombre.isBlank()) {
-            throw new IllegalArgumentException(
-                    "El nombre del bloque es obligatorio.");
+            this.bloqueRepository = bloqueRepository;
+            this.vendedorRepository = vendedorRepository;
+            this.productoRepository = productoRepository;
+            this.historialService = historialService;
         }
 
-        final String nombreValidado = nombre.trim();
-
-        if (nombreValidado.length() > 100) {
-            throw new IllegalArgumentException(
-                    "El nombre no puede superar los 100 caracteres.");
+        // Listar todos los bloques
+        public List<Bloque> listarTodos() {
+            return bloqueRepository.findAll();
         }
 
-        String descripcionValidada = null;
+        // Crear un bloque nuevo
+        @Transactional
+        public void crearBloque(
+                String nombre,
+                String descripcion,
+                String usernameAdministrador) {
 
-        if (descripcion != null && !descripcion.isBlank()) {
-            descripcionValidada = descripcion.trim();
-
-            if (descripcionValidada.length() > 255) {
+            if (nombre == null || nombre.isBlank()) {
                 throw new IllegalArgumentException(
-                        "La descripción no puede superar los 255 caracteres.");
+                        "El nombre del bloque es obligatorio.");
             }
-        }
 
-        boolean duplicado = bloqueRepository.findAll().stream()
-                .anyMatch(b -> b.getNombre() != null
-                        && b.getNombre().equalsIgnoreCase(nombreValidado));
+            final String nombreValidado = nombre.trim();
 
-        if (duplicado) {
-            throw new IllegalArgumentException(
-                    "Ya existe un bloque con ese nombre.");
-        }
+            if (nombreValidado.length() > 100) {
+                throw new IllegalArgumentException(
+                        "El nombre no puede superar los 100 caracteres.");
+            }
 
-        Bloque bloque = Bloque.builder()
-                .nombre(nombreValidado)
-                .descripcion(descripcionValidada)
-                .activo(true)
-                .build();
+            String descripcionValidada = null;
 
-        Bloque guardado = bloqueRepository.save(bloque);
+            if (descripcion != null && !descripcion.isBlank()) {
+                descripcionValidada = descripcion.trim();
 
-        historialService.registrarMovimiento(
-                usernameAdministrador,
-                "CREAR",
-                "BLOQUE",
-                guardado.getId(),
-                "Se creó el bloque " + guardado.getNombre(),
-                null,
-                "Nombre: " + guardado.getNombre()
-                        + ", Descripción: " + guardado.getDescripcion()
-                        + ", Activo: true"
-        );
-    }
+                if (descripcionValidada.length() > 255) {
+                    throw new IllegalArgumentException(
+                            "La descripción no puede superar los 255 caracteres.");
+                }
+            }
 
-    // Activar o desactivar un bloque
-    @Transactional
-    public void cambiarEstado(
-            Long idBloque,
-            boolean activar,
-            String usernameAdministrador) {
+            boolean duplicado = bloqueRepository.findAll().stream()
+                    .anyMatch(b -> b.getNombre() != null
+                            && b.getNombre().equalsIgnoreCase(nombreValidado));
 
-        Bloque bloque = bloqueRepository.findById(idBloque)
-                .orElseThrow(() -> new IllegalArgumentException(
-                        "El bloque no existe."));
+            if (duplicado) {
+                throw new IllegalArgumentException(
+                        "Ya existe un bloque con ese nombre.");
+            }
 
-        boolean estadoAnterior =
-                Boolean.TRUE.equals(bloque.getActivo());
+            Bloque bloque = Bloque.builder()
+                    .nombre(nombreValidado)
+                    .descripcion(descripcionValidada)
+                    .activo(true)
+                    .build();
 
-        if (estadoAnterior == activar) {
-            throw new IllegalArgumentException(
-                    activar
-                            ? "El bloque ya está activo."
-                            : "El bloque ya está desactivado."
+            Bloque guardado = bloqueRepository.save(bloque);
+
+            historialService.registrarMovimiento(
+                    usernameAdministrador,
+                    "CREAR",
+                    "BLOQUE",
+                    guardado.getId(),
+                    "Se creó el bloque " + guardado.getNombre(),
+                    null,
+                    "Nombre: " + guardado.getNombre()
+                            + ", Descripción: " + guardado.getDescripcion()
+                            + ", Activo: true"
             );
         }
 
-        // No permitir desactivar bloques con vendedores o productos
-        if (!activar) {
+        // Activar o desactivar un bloque
+        @Transactional
+        public void cambiarEstado(
+                Long idBloque,
+                boolean activar,
+                String usernameAdministrador) {
 
-            if (vendedorRepository.existsByBloqueId(idBloque)) {
+            Bloque bloque = bloqueRepository.findById(idBloque)
+                    .orElseThrow(() -> new IllegalArgumentException(
+                            "El bloque no existe."));
+
+            boolean estadoAnterior =
+                    Boolean.TRUE.equals(bloque.getActivo());
+
+            if (estadoAnterior == activar) {
                 throw new IllegalArgumentException(
-                        "No se puede desactivar el bloque porque tiene vendedores asociados.");
+                        activar
+                                ? "El bloque ya está activo."
+                                : "El bloque ya está desactivado."
+                );
             }
 
-            if (productoRepository.existsByBloqueId(idBloque)) {
-                throw new IllegalArgumentException(
-                        "No se puede desactivar el bloque porque tiene productos asociados.");
+            // No permitir desactivar bloques con vendedores o productos
+            if (!activar) {
+
+                if (vendedorRepository.existsByBloqueId(idBloque)) {
+                    throw new IllegalArgumentException(
+                            "No se puede desactivar el bloque porque tiene vendedores asociados.");
+                }
+
+                if (productoRepository.existsByBloqueId(idBloque)) {
+                    throw new IllegalArgumentException(
+                            "No se puede desactivar el bloque porque tiene productos asociados.");
+                }
             }
+
+            bloque.setActivo(activar);
+            bloqueRepository.save(bloque);
+
+            historialService.registrarMovimiento(
+                    usernameAdministrador,
+                    activar ? "ACTIVAR" : "DESACTIVAR",
+                    "BLOQUE",
+                    idBloque,
+                    (activar ? "Se activó" : "Se desactivó")
+                            + " el bloque " + bloque.getNombre(),
+                    "Activo: " + estadoAnterior,
+                    "Activo: " + activar
+            );
         }
-
-        bloque.setActivo(activar);
-        bloqueRepository.save(bloque);
-
-        historialService.registrarMovimiento(
-                usernameAdministrador,
-                activar ? "ACTIVAR" : "DESACTIVAR",
-                "BLOQUE",
-                idBloque,
-                (activar ? "Se activó" : "Se desactivó")
-                        + " el bloque " + bloque.getNombre(),
-                "Activo: " + estadoAnterior,
-                "Activo: " + activar
-        );
     }
-}

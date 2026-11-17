@@ -38,11 +38,15 @@ public class ProductoVendedorRestController {
     public ResponseEntity<List<ProductoVendedor>> listarInventarioVendedor(@PathVariable Long idVendedor) {
         return new ResponseEntity<>(productoVendedorService.listarProductosVendedor(idVendedor), HttpStatus.OK);
     }*/
-    @GetMapping("/vendedor/{idVendedor}")
-    public ResponseEntity<List<InventarioResponseDTO>> listarInventarioVendedor(@PathVariable Long idVendedor) {
+    @GetMapping("/vendedor")
+    public ResponseEntity<List<InventarioResponseDTO>> listarInventarioVendedor(Principal principal) {
+
+        Vendedor vendedor = vendedorRepository.findByUsuario_Username(principal.getName()).orElseThrow(() -> new IllegalArgumentException(
+                "No se encontro ese vendedor auntenticado"
+        ));
 
         // 1. Obtenemos las entidades de la base de datos
-        List<ProductoVendedor> inventario = productoVendedorService.listarProductosVendedor(idVendedor);
+        List<ProductoVendedor> inventario = productoVendedorService.listarProductosVendedor(vendedor.getId());
 
         // 2. Transformamos la entidad compleja en nuestro DTO seguro
         List<InventarioResponseDTO> respuesta = inventario.stream().map(pv -> {
@@ -70,7 +74,7 @@ public class ProductoVendedorRestController {
                     ));
 
             productoVendedorService.asignarProducto(
-                    request.getIdVendedor(),
+                    vendedor.getId(),
                     request.getIdProducto(),
                     request.getPrecio()
             );

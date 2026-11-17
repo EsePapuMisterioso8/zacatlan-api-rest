@@ -4,9 +4,12 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import unam.fes.entity.solicitud.SolicitudCambioPrecio;
+import unam.fes.entity.vendedor.Vendedor;
+import unam.fes.repository.VendedorRepository;
 import unam.fes.service.SolicitudCambioPrecioService;
 
 import java.math.BigDecimal;
+import java.security.Principal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -16,9 +19,11 @@ import java.util.stream.Collectors;
 public class SolicitudCambioPrecioRestController {
 
     private final SolicitudCambioPrecioService solicitudService;
+    private final VendedorRepository vendedorRepository;
 
-    public SolicitudCambioPrecioRestController(SolicitudCambioPrecioService solicitudService) {
+    public SolicitudCambioPrecioRestController(SolicitudCambioPrecioService solicitudService , VendedorRepository vendedorRepository) {
         this.solicitudService = solicitudService;
+        this.vendedorRepository = vendedorRepository;
     }
 
     // --- MÉTODO TRADUCTOR (Entidad -> DTO Seguro) ---
@@ -43,10 +48,15 @@ public class SolicitudCambioPrecioRestController {
 
     // 1. POST: Crear una solicitud de cambio de precio
     @PostMapping
-    public ResponseEntity<?> crearSolicitud(@RequestBody NuevaSolicitudDTO request) {
+    public ResponseEntity<?> crearSolicitud(@RequestBody NuevaSolicitudDTO request , Principal principal) {
         try {
+            Vendedor vendedor = vendedorRepository.findByUsuario_Username(principal.getName())
+                            .orElseThrow( () -> new IllegalArgumentException(
+                                    "No se encontro el vendedor auntentificado"
+                            ));
+
             solicitudService.solicitarCambioPrecio(
-                    request.getIdVendedor(),
+                    vendedor.getId(),
                     request.getIdProductoVendedor(),
                     request.getPrecioSolicitado()
             );
@@ -57,11 +67,22 @@ public class SolicitudCambioPrecioRestController {
     }
 
     // 2. GET: Listar historial de solicitudes del vendedor
-    @GetMapping("/vendedor/{idVendedor}")
-    public ResponseEntity<List<SolicitudResponseDTO>> misSolicitudes(@PathVariable Long idVendedor) {
-        List<SolicitudResponseDTO> respuesta = solicitudService.listarSolicitudesVendedor(idVendedor)
-                .stream().map(this::convertirADTO).collect(Collectors.toList());
-        return new ResponseEntity<>(respuesta, HttpStatus.OK);
+    @GetMapping("/vendedor")
+    public ResponseEntity<?> misSolicitudes(Principal principal) {
+        try {
+
+            Vendedor vendedor = vendedorRepository.findByUsuario_Username(principal.getName())
+                    .orElseThrow(() -> new IllegalArgumentException(
+                            "No se encontró este vendedor auntentificado"
+                    ));
+
+            List<SolicitudResponseDTO> respuesta = solicitudService.listarSolicitudesVendedor(vendedor.getId())
+                    .stream().map(this::convertirADTO).collect(Collectors.toList());
+            return new ResponseEntity<>(respuesta, HttpStatus.OK);
+        }catch (IllegalArgumentException e){
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+
     }
 
     /* ========================================================
