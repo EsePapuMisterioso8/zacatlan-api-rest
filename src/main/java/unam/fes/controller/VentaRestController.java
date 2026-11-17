@@ -97,17 +97,27 @@ public class VentaRestController {
     }
 
     // 3. GET: Listar ventas de un vendedor específico
-    @GetMapping("/vendedor/{idVendedor}")
-    public ResponseEntity<List<VentaResponseDTO>> listarPorVendedor(
-            @PathVariable Long idVendedor) {
+    @GetMapping("/vendedor")
+    public ResponseEntity<?> listarPorVendedor(
+            Principal principal) {
 
-        List<VentaResponseDTO> respuesta =
-                ventaService.listarVentasVendedor(idVendedor)
-                        .stream()
-                        .map(this::convertirADTO)
-                        .collect(Collectors.toList());
+        try {
 
-        return new ResponseEntity<>(respuesta, HttpStatus.OK);
+            Vendedor vendedor = vendedorRepository.findByUsuario_Username(principal.getName())
+                    .orElseThrow(() -> new IllegalArgumentException(
+                            "No se encontro al vendedor auntentificado"
+                    ));
+            List<VentaResponseDTO> respuesta =
+                    ventaService.listarVentasVendedor(vendedor.getId())
+                            .stream()
+                            .map(this::convertirADTO)
+                            .collect(Collectors.toList());
+
+            return new ResponseEntity<>(respuesta, HttpStatus.OK);
+        }catch (IllegalArgumentException e){
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+
     }
 
     // 4. GET: Listar ventas de un día específico

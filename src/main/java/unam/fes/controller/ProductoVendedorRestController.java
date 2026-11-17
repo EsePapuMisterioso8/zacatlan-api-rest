@@ -29,8 +29,25 @@ public class ProductoVendedorRestController {
 
     // 1. GET: Catálogo disponible para el vendedor (según su bloque)
     @GetMapping("/catalogo/bloque/{idBloque}")
-    public ResponseEntity<List<Producto>> listarCatalogoBloque(@PathVariable Long idBloque) {
-        return new ResponseEntity<>(productoVendedorService.listarCatalogo(idBloque), HttpStatus.OK);
+    public ResponseEntity<?> listarCatalogoBloque(@PathVariable Long idBloque, Principal principal) {
+
+        try {
+            Vendedor vendedor = vendedorRepository.findByUsuario_Username(principal.getName()).orElseThrow(() -> new IllegalArgumentException(
+                    "No se encontro al vendedor auntentificado"
+            ));
+
+            Long idBloqueVendedor = vendedor.getBloque().getId();
+
+            if(!idBloque.equals(idBloqueVendedor)){
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("No se puede consultar el catalogo de otro bloque");
+            }
+
+
+            return new ResponseEntity<>(productoVendedorService.listarCatalogo(idBloque), HttpStatus.OK);
+        }catch (IllegalArgumentException e){
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+        }
+
     }
 
     // 2. GET: Mi inventario (Productos que el vendedor ya configuró para vender)
@@ -39,28 +56,32 @@ public class ProductoVendedorRestController {
         return new ResponseEntity<>(productoVendedorService.listarProductosVendedor(idVendedor), HttpStatus.OK);
     }*/
     @GetMapping("/vendedor")
-    public ResponseEntity<List<InventarioResponseDTO>> listarInventarioVendedor(Principal principal) {
+    public ResponseEntity<?> listarInventarioVendedor(Principal principal) {
 
-        Vendedor vendedor = vendedorRepository.findByUsuario_Username(principal.getName()).orElseThrow(() -> new IllegalArgumentException(
-                "No se encontro ese vendedor auntenticado"
-        ));
+        try {
+            Vendedor vendedor = vendedorRepository.findByUsuario_Username(principal.getName()).orElseThrow(() -> new IllegalArgumentException(
+                    "No se encontro ese vendedor auntenticado"
+            ));
 
-        // 1. Obtenemos las entidades de la base de datos
-        List<ProductoVendedor> inventario = productoVendedorService.listarProductosVendedor(vendedor.getId());
+            // 1. Obtenemos las entidades de la base de datos
+            List<ProductoVendedor> inventario = productoVendedorService.listarProductosVendedor(vendedor.getId());
 
-        // 2. Transformamos la entidad compleja en nuestro DTO seguro
-        List<InventarioResponseDTO> respuesta = inventario.stream().map(pv -> {
-            InventarioResponseDTO dto = new InventarioResponseDTO();
-            dto.setIdProductoVendedor(pv.getId());
-            dto.setNombreProducto(pv.getProducto().getNombre());
-            dto.setDescripcionProducto(pv.getProducto().getDescripcion());
-            dto.setPrecio(pv.getPrecio());
-            dto.setActivo(pv.getActivo());
-            return dto;
-        }).collect(Collectors.toList());
+            // 2. Transformamos la entidad compleja en nuestro DTO seguro
+            List<InventarioResponseDTO> respuesta = inventario.stream().map(pv -> {
+                InventarioResponseDTO dto = new InventarioResponseDTO();
+                dto.setIdProductoVendedor(pv.getId());
+                dto.setNombreProducto(pv.getProducto().getNombre());
+                dto.setDescripcionProducto(pv.getProducto().getDescripcion());
+                dto.setPrecio(pv.getPrecio());
+                dto.setActivo(pv.getActivo());
+                return dto;
+            }).collect(Collectors.toList());
 
-        // 3. Devolvemos la lista limpia
-        return new ResponseEntity<>(respuesta, HttpStatus.OK);
+            // 3. Devolvemos la lista limpia
+            return new ResponseEntity<>(respuesta, HttpStatus.OK);
+        }catch (IllegalArgumentException e){
+           return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+        }
     }
 
     // 3. POST: Asignar un producto al inventario del vendedor y fijarle un precio
@@ -72,6 +93,10 @@ public class ProductoVendedorRestController {
                     new IllegalArgumentException(
                             "No se encontro ningún usuario con ese nombre de usuario"
                     ));
+
+            if(request.getIdProducto() == null || request.getPrecio() == null){
+                return ResponseEntity.badRequest().body("El producto y el precio son obligatorios");
+            }
 
             productoVendedorService.asignarProducto(
                     vendedor.getId(),
