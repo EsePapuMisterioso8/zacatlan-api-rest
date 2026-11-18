@@ -40,6 +40,14 @@ public class VendedorService {
         return vendedorRepository.findByEstadoSolicitud("PENDIENTE");
     }
 
+    @Transactional(readOnly = true)
+    public List<Vendedor> listarVendedoresAprobados() {
+        return vendedorRepository.findAll()
+                .stream()
+                .filter(v -> "APROBADA".equals(v.getEstadoSolicitud()))
+                .toList();
+    }
+
     // Registrar una solicitud de vendedor
     @Transactional
     public Vendedor registrarSolicitud(

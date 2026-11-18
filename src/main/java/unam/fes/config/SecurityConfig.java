@@ -35,7 +35,11 @@ public class SecurityConfig {
                                 HttpMethod.POST,
                                 "/api/vendedores/registro"
                         ).permitAll()
-
+                        // Consulta pública de bloques para el registro de vendedores
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/bloques"
+                        ).permitAll()
                         // ADMINISTRADOR: administración general
                         .requestMatchers("/api/admin/**")
                         .hasAnyAuthority("ADMINISTRADOR", "ROLE_ADMINISTRADOR")
@@ -53,6 +57,12 @@ public class SecurityConfig {
                                 "/api/vendedores/**"
                         ).hasAnyAuthority("ADMINISTRADOR", "ROLE_ADMINISTRADOR")
 
+                        // ADMINISTRADOR: consultar bitácora
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/historial"
+                        ).hasAnyAuthority("ADMINISTRADOR", "ROLE_ADMINISTRADOR")
+
                         // ADMINISTRADOR: reportes y ventas
                         .requestMatchers(
                                 HttpMethod.GET,
@@ -60,7 +70,9 @@ public class SecurityConfig {
                                 "/api/ventas",
                                 "/api/ventas/dia",
                                 "/api/ventas/totales",
-                                "/api/ventas/rango"
+                                "/api/ventas/rango",
+                                "/api/ventas/vendedor/*",
+                                "/api/ventas/vendedor/*/rango"
                         ).hasAnyAuthority("ADMINISTRADOR", "ROLE_ADMINISTRADOR")
 
                         // ADMINISTRADOR: solicitudes de cambio de precio
@@ -74,6 +86,7 @@ public class SecurityConfig {
                                 "/api/solicitudes-precio/*/autorizar",
                                 "/api/solicitudes-precio/*/rechazar"
                         ).hasAnyAuthority("ADMINISTRADOR", "ROLE_ADMINISTRADOR")
+
                         // ADMINISTRADOR: consultar solicitudes pendientes de vendedores
                         .requestMatchers(
                                 HttpMethod.GET,

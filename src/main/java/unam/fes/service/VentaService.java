@@ -3,12 +3,14 @@ package unam.fes.service;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import unam.fes.entity.detalle.DetalleVenta;
 import unam.fes.entity.proven.ProductoVendedor;
 import unam.fes.entity.vendedor.Vendedor;
 import unam.fes.entity.venta.Venta;
 import unam.fes.entity.venta.VentaRequestDTO;
 import unam.fes.entity.venta.VentaDetalleResponseDTO;
+
 import unam.fes.repository.DetalleVentaRepository;
 import unam.fes.repository.ProductoVendedorRepository;
 import unam.fes.repository.VendedorRepository;
@@ -68,6 +70,7 @@ public class VentaService {
         BigDecimal total = BigDecimal.ZERO;
 
         for (VentaRequestDTO.ItemVenta item : items) {
+
             Long idProductoVendedor = item.getIdProductoVendedor();
             Integer cantidad = item.getCantidad();
 
@@ -87,12 +90,15 @@ public class VentaService {
                 throw new IllegalArgumentException("Uno de los productos está inactivo.");
             }
 
-            // Si se envía un precio personalizado válido, se utiliza.
-            // De lo contrario, se toma el precio habitual del inventario.
-            BigDecimal precioFinal = (item.getPrecioVenta() != null
-                    && item.getPrecioVenta().compareTo(BigDecimal.ZERO) > 0)
+            // El vendedor puede cobrar cualquier precio, siempre que sea mayor que cero.
+            BigDecimal precioFinal = item.getPrecioVenta() != null
                     ? item.getPrecioVenta()
                     : productoVendedor.getPrecio();
+
+            if (precioFinal == null || precioFinal.compareTo(BigDecimal.ZERO) <= 0) {
+                throw new IllegalArgumentException(
+                        "El precio de venta debe ser mayor que cero.");
+            }
 
             BigDecimal subtotal = precioFinal.multiply(BigDecimal.valueOf(cantidad));
 
@@ -109,31 +115,24 @@ public class VentaService {
         }
 
         venta.setTotal(total);
+
         Venta ventaGuardada = ventaRepository.save(venta);
         detalleVentaRepository.saveAll(ventaGuardada.getDetalles());
 
         return ventaGuardada;
     }
 
-    /*
-    @Transactional
-    public Venta registrarVenta(
-            Long idVendedor,
-            Map<Long, Integer> productosCantidad) {
-
-        // Implementación anterior conservada como referencia.
-    }
-    */
-
+    // Ventas de un vendedor
     public List<Venta> listarVentasVendedor(Long idVendedor) {
         return ventaRepository.findByVendedorIdOrderByFechaHoraDesc(idVendedor);
     }
 
+    // Todas las ventas
     public List<Venta> listarTodasLasVentas() {
         return ventaRepository.findAllByOrderByFechaHoraDesc();
     }
 
-    // Consultar una venta por ID incluyendo sus detalles.
+    // Detalle de una venta
     @Transactional(readOnly = true)
     public VentaDetalleResponseDTO obtenerDetalleVenta(Long idVenta) {
 
@@ -163,6 +162,7 @@ public class VentaService {
                 .build();
     }
 
+    // Ventas de un día
     public List<Venta> listarVentasPorDia(LocalDate fecha) {
 
         LocalDateTime inicio = fecha.atStartOfDay();
@@ -175,6 +175,7 @@ public class VentaService {
                 );
     }
 
+    // Totales por vendedor en un día
     public Map<String, BigDecimal> calcularVentasPorVendedor(LocalDate fecha) {
 
         List<Venta> ventas = listarVentasPorDia(fecha);
@@ -191,7 +192,7 @@ public class VentaService {
         return totales;
     }
 
-    // Método para consultar ventas por rango de fecha.
+    // Ventas por rango de fechas
     public List<Venta> listarVentasPorRango(LocalDate fechaInicio, LocalDate fechaFin) {
 
         LocalDateTime inicio = fechaInicio.atStartOfDay();
@@ -199,6 +200,23 @@ public class VentaService {
 
         return ventaRepository
                 .findByFechaHoraGreaterThanEqualAndFechaHoraLessThanOrderByFechaHoraAsc(
+                        inicio,
+                        fin
+                );
+    }
+
+    // Ventas de un vendedor dentro de un rango de fechas
+    public List<Venta> listarVentasPorVendedorYRango(
+            Long idVendedor,
+            LocalDate fechaInicio,
+            LocalDate fechaFin) {
+
+        LocalDateTime inicio = fechaInicio.atStartOfDay();
+        LocalDateTime fin = fechaFin.plusDays(1).atStartOfDay();
+
+        return ventaRepository
+                .findByVendedorIdAndFechaHoraGreaterThanEqualAndFechaHoraLessThanOrderByFechaHoraDesc(
+                        idVendedor,
                         inicio,
                         fin
                 );

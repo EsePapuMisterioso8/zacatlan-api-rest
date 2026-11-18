@@ -107,6 +107,32 @@ public class ProductoVendedorRestController {
         } catch (IllegalArgumentException e) {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
         }
+
+
+    }
+
+    // Consultar el bloque asignado al vendedor autenticado
+    @GetMapping("/vendedor/bloque")
+    public ResponseEntity<?> obtenerBloqueVendedor(Principal principal) {
+
+        try {
+            Vendedor vendedor = vendedorRepository
+                    .findByUsuario_Username(principal.getName())
+                    .orElseThrow(() -> new IllegalArgumentException(
+                            "No se encontró al vendedor autenticado"
+                    ));
+
+            return ResponseEntity.ok(
+                    new BloqueVendedorDTO(
+                            vendedor.getBloque().getId(),
+                            vendedor.getBloque().getNombre()
+                    )
+            );
+
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(e.getMessage());
+        }
     }
 
     //CLASE AUXILIAR DTO
@@ -124,5 +150,24 @@ public class ProductoVendedorRestController {
         public void setIdVendedor(Long idVendedor) { this.idVendedor = idVendedor; }
         public void setIdProducto(Long idProducto) { this.idProducto = idProducto; }
         public void setPrecio(BigDecimal precio) { this.precio = precio; }
+    }
+
+    public static class BloqueVendedorDTO {
+
+        private Long idBloque;
+        private String nombreBloque;
+
+        public BloqueVendedorDTO(Long idBloque, String nombreBloque) {
+            this.idBloque = idBloque;
+            this.nombreBloque = nombreBloque;
+        }
+
+        public Long getIdBloque() {
+            return idBloque;
+        }
+
+        public String getNombreBloque() {
+            return nombreBloque;
+        }
     }
 }

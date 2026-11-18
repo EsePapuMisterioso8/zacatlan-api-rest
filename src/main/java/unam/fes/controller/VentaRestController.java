@@ -2,9 +2,12 @@
 package unam.fes.controller;
 
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import unam.fes.entity.venta.Venta;
@@ -14,10 +17,14 @@ import unam.fes.entity.venta.VentaDetalleResponseDTO;
 import unam.fes.entity.vendedor.Vendedor;
 import unam.fes.repository.VendedorRepository;
 import unam.fes.service.VentaService;
+import unam.fes.service.ReportePdfService;
 
+import java.io.IOException;
+import java.math.BigDecimal;
 import java.security.Principal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestController
@@ -26,12 +33,15 @@ public class VentaRestController {
 
     private final VentaService ventaService;
     private final VendedorRepository vendedorRepository;
+    private final ReportePdfService reportePdfService;
 
     public VentaRestController(
             VentaService ventaService,
-            VendedorRepository vendedorRepository) {
+            VendedorRepository vendedorRepository,
+            ReportePdfService reportePdfService) {
         this.ventaService = ventaService;
         this.vendedorRepository = vendedorRepository;
+        this.reportePdfService = reportePdfService;
     }
 
     // Entidad -> DTO
@@ -50,7 +60,7 @@ public class VentaRestController {
         return dto;
     }
 
-    // 1. POST: Registrar una nueva venta
+    // 1. Registrar una nueva venta
     @PostMapping
     public ResponseEntity<?> registrarVenta(
             @RequestBody VentaRequestDTO request,
@@ -82,7 +92,7 @@ public class VentaRestController {
         }
     }
 
-    // 2. GET: Listar todas las ventas
+    // 2. Listar todas las ventas
     @GetMapping
     public ResponseEntity<List<VentaResponseDTO>> listarTodas() {
 
@@ -95,7 +105,7 @@ public class VentaRestController {
         return new ResponseEntity<>(respuesta, HttpStatus.OK);
     }
 
-    // 3. GET: Listar ventas del vendedor autenticado
+    // 3. Listar ventas del vendedor autenticado
     @GetMapping("/vendedor")
     public ResponseEntity<?> listarPorVendedor(Principal principal) {
 
@@ -119,7 +129,7 @@ public class VentaRestController {
         }
     }
 
-    // 4. GET: Consultar una venta por ID con sus detalles
+    // 4. Consultar una venta por ID con sus detalles
     @GetMapping("/{id}")
     public ResponseEntity<?> obtenerPorId(
             @PathVariable Long id,
@@ -155,7 +165,7 @@ public class VentaRestController {
         }
     }
 
-    // 5. GET: Listar ventas de un día específico
+    // 5. Listar ventas de un día específico
     @GetMapping("/dia")
     public ResponseEntity<?> listarPorDia(
             @RequestParam
@@ -176,7 +186,7 @@ public class VentaRestController {
         return new ResponseEntity<>(respuesta, HttpStatus.OK);
     }
 
-    // 6. GET: Obtener el total vendido por cada vendedor en un día
+    // 6. Obtener el total vendido por cada vendedor en un día
     @GetMapping("/totales")
     public ResponseEntity<?> totalesPorVendedor(
             @RequestParam
@@ -194,7 +204,7 @@ public class VentaRestController {
         );
     }
 
-    // 7. GET: Listar ventas por rango de fechas
+    // 7. Listar ventas por rango de fechas
     @GetMapping("/rango")
     public ResponseEntity<?> listarPorRango(
             @RequestParam
@@ -229,6 +239,124 @@ public class VentaRestController {
                     "Ocurrió un error interno al consultar las ventas.",
                     HttpStatus.INTERNAL_SERVER_ERROR
             );
+        }
+    }
+
+    // 8. Listar ventas de un vendedor específico
+    @GetMapping("/vendedor/{idVendedor}")
+    public ResponseEntity<?> listarPorVendedorId(
+            @PathVariable Long idVendedor) {
+
+        if (!vendedorRepository.existsById(idVendedor)) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body("El vendedor no existe.");
+        }
+
+        List<VentaResponseDTO> respuesta =
+                ventaService.listarVentasVendedor(idVendedor)
+                        .stream()
+                        .map(this::convertirADTO)
+                        .collect(Collectors.toList());
+
+        return ResponseEntity.ok(respuesta);
+    }
+
+    // 9. Listar ventas de un vendedor dentro de un rango de fechas
+    @GetMapping("/vendedor/{idVendedor}/rango")
+    public ResponseEntity<?> listarPorVendedorYRango(
+            @PathVariable Long idVendedor,
+
+            @RequestParam
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+            LocalDate fechaInicio,
+
+            @RequestParam
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+            LocalDate fechaFin) {
+
+        if (!vendedorRepository.existsById(idVendedor)) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body("El vendedor no existe.");
+        }
+
+        if (fechaInicio.isAfter(fechaFin)) {
+            return ResponseEntity.badRequest()
+                    .body("La fecha de inicio no puede ser posterior a la fecha final.");
+        }
+
+        if (fechaFin.isAfter(LocalDate.now())) {
+            return ResponseEntity.badRequest()
+                    .body("No se pueden consultar rangos que incluyan fechas futuras.");
+        }
+
+        List<VentaResponseDTO> respuesta =
+                ventaService.listarVentasPorVendedorYRango(
+                                idVendedor,
+                                fechaInicio,
+                                fechaFin
+                        )
+                        .stream()
+                        .map(this::convertirADTO)
+                        .collect(Collectors.toList());
+
+        return ResponseEntity.ok(respuesta);
+    }
+
+    // 10. Generar PDF del reporte diario (solo administrador)
+    @GetMapping("/reporte/pdf")
+    @Transactional(readOnly = true)
+    public ResponseEntity<?> generarReportePdf(
+            @RequestParam
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+            LocalDate fecha,
+            Authentication authentication) {
+
+        boolean esAdmin = authentication.getAuthorities().stream()
+                .anyMatch(a ->
+                        a.getAuthority().equals("ADMINISTRADOR")
+                                || a.getAuthority().equals("ROLE_ADMINISTRADOR")
+                );
+
+        if (!esAdmin) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body("No tienes permiso para generar reportes.");
+        }
+
+        if (fecha.isAfter(LocalDate.now())) {
+            return ResponseEntity.badRequest()
+                    .body("No se pueden generar reportes de fechas futuras.");
+        }
+
+        try {
+            List<Venta> ventas = ventaService.listarVentasPorDia(fecha);
+
+            BigDecimal totalDia = ventas.stream()
+                    .map(Venta::getTotal)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            Map<String, BigDecimal> ventasPorVendedor =
+                    ventaService.calcularVentasPorVendedor(fecha);
+
+            byte[] pdf = reportePdfService.generarReporteDiario(
+                    fecha,
+                    ventas,
+                    totalDia,
+                    ventasPorVendedor
+            );
+
+            String nombreArchivo = "reporte-ventas-" + fecha + ".pdf";
+
+            return ResponseEntity.ok()
+                    .contentType(MediaType.APPLICATION_PDF)
+                    .header(
+                            HttpHeaders.CONTENT_DISPOSITION,
+                            "attachment; filename=\"" + nombreArchivo + "\""
+                    )
+                    .body(pdf);
+
+        } catch (IOException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Ocurrió un error al generar el reporte PDF.");
         }
     }
 }

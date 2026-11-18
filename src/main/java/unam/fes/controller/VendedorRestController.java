@@ -4,7 +4,11 @@ package unam.fes.controller;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import unam.fes.entity.vendedor.VendedorDTO;
 import unam.fes.service.VendedorService;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/vendedores")
@@ -22,6 +26,37 @@ public class VendedorRestController {
         return ResponseEntity.ok(
                 vendedorService.listarSolicitudesPendientes()
         );
+    }
+
+    // Consultar vendedores aprobados (solo administrador)
+    @GetMapping
+    public ResponseEntity<List<VendedorDTO>> listarVendedoresAprobados() {
+
+        List<VendedorDTO> vendedores = vendedorService
+                .listarVendedoresAprobados()
+                .stream()
+                .map(vendedor -> VendedorDTO.builder()
+                        .id(vendedor.getId())
+                        .nombre(vendedor.getNombre())
+                        .apellido(vendedor.getApellido())
+                        .username(
+                                vendedor.getUsuario() != null
+                                        ? vendedor.getUsuario().getUsername()
+                                        : vendedor.getUsernameSolicitado()
+                        )
+                        .telefono(vendedor.getTelefono())
+                        .nombreBloque(
+                                vendedor.getBloque() != null
+                                        ? vendedor.getBloque().getNombre()
+                                        : null
+                        )
+                        .estadoSolicitud(vendedor.getEstadoSolicitud())
+                        .activo(vendedor.getActivo())
+                        .build()
+                )
+                .toList();
+
+        return ResponseEntity.ok(vendedores);
     }
 
     // Registrar solicitud
