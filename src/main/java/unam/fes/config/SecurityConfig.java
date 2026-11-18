@@ -74,6 +74,11 @@ public class SecurityConfig {
                                 "/api/solicitudes-precio/*/autorizar",
                                 "/api/solicitudes-precio/*/rechazar"
                         ).hasAnyAuthority("ADMINISTRADOR", "ROLE_ADMINISTRADOR")
+                        // ADMINISTRADOR: consultar solicitudes pendientes de vendedores
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/vendedores/pendientes"
+                        ).hasAnyAuthority("ADMINISTRADOR", "ROLE_ADMINISTRADOR")
 
                         // VENDEDOR: registrar y consultar sus ventas
                         .requestMatchers(

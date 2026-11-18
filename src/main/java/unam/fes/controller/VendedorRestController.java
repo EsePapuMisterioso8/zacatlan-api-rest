@@ -16,6 +16,14 @@ public class VendedorRestController {
         this.vendedorService = vendedorService;
     }
 
+    // Consultar solicitudes pendientes (solo administrador)
+    @GetMapping("/pendientes")
+    public ResponseEntity<?> listarSolicitudesPendientes() {
+        return ResponseEntity.ok(
+                vendedorService.listarSolicitudesPendientes()
+        );
+    }
+
     // Registrar solicitud
     @PostMapping("/registro")
     public ResponseEntity<String> registrar(

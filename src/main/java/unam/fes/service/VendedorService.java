@@ -1,7 +1,7 @@
 
 package unam.fes.service;
 
-import jakarta.transaction.Transactional;
+
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import unam.fes.entity.bloque.Bloque;
@@ -10,9 +10,10 @@ import unam.fes.entity.vendedor.Vendedor;
 import unam.fes.repository.BloqueRepository;
 import unam.fes.repository.UsuarioRepository;
 import unam.fes.repository.VendedorRepository;
-
+import org.springframework.transaction.annotation.Transactional;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 public class VendedorService {
@@ -32,6 +33,11 @@ public class VendedorService {
         this.bloqueRepository = bloqueRepository;
         this.usuarioRepository = usuarioRepository;
         this.passwordEncoder = passwordEncoder;
+    }
+
+    @Transactional(readOnly = true)
+    public List<Vendedor> listarSolicitudesPendientes() {
+        return vendedorRepository.findByEstadoSolicitud("PENDIENTE");
     }
 
     // Registrar una solicitud de vendedor
@@ -348,4 +354,5 @@ public class VendedorService {
 
         return valor;
     }
+
 }
