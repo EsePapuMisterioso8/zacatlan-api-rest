@@ -75,6 +75,37 @@ public class ProductoService {
     }
 
     @Transactional
+    public Producto actualizarProducto(
+            Long idProducto,
+            String nombre,
+            String descripcion) {
+
+        if (nombre == null || nombre.isBlank()) {
+            throw new IllegalArgumentException(
+                    "El nombre del producto es obligatorio");
+        }
+
+        Producto producto = productoRepository.findById(idProducto)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "No se encontró el producto"));
+
+        nombre = nombre.trim();
+
+        Long idBloque = producto.getBloque().getId();
+
+        if (productoRepository.existsByNombreIgnoreCaseAndBloqueIdAndIdNot(
+                nombre, idBloque, idProducto)) {
+            throw new IllegalArgumentException(
+                    "Ya existe un producto con ese nombre en el bloque");
+        }
+
+        producto.setNombre(nombre);
+        producto.setDescripcion(descripcion);
+
+        return productoRepository.save(producto);
+    }
+
+    @Transactional
     public void cambiarEstadoProducto(Long idProducto) {
 
         Producto producto = productoRepository.findById(idProducto)

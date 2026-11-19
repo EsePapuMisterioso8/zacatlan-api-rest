@@ -1,16 +1,18 @@
 
 package unam.fes.service;
 
-
+import org.springframework.data.domain.PageRequest;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import unam.fes.entity.bloque.Bloque;
 import unam.fes.entity.usuario.Usuario;
 import unam.fes.entity.vendedor.Vendedor;
 import unam.fes.repository.BloqueRepository;
 import unam.fes.repository.UsuarioRepository;
 import unam.fes.repository.VendedorRepository;
-import org.springframework.transaction.annotation.Transactional;
+
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -46,6 +48,20 @@ public class VendedorService {
                 .stream()
                 .filter(v -> "APROBADA".equals(v.getEstadoSolicitud()))
                 .toList();
+    }
+
+    // Buscar vendedores aprobados por nombre o apellido
+    @Transactional(readOnly = true)
+    public List<Vendedor> buscarVendedoresAprobadosPorNombre(String texto) {
+
+        if (texto == null || texto.isBlank()) {
+            return List.of();
+        }
+
+        return vendedorRepository.buscarAprobadosPorNombre(
+                texto.trim(),
+                PageRequest.of(0, 15)
+        );
     }
 
     // Registrar una solicitud de vendedor
@@ -354,7 +370,7 @@ public class VendedorService {
         }
 
         if (!valor.matches(
-                "[\\p{L}]+(?:[ '\\u002D][\\p{L}]+)*")) {
+                "[\\p{L}]+(?:[ '-][\\p{L}]+)*")) {
 
             throw new IllegalArgumentException(
                     campo + " solo puede contener letras, espacios, guiones y apóstrofes");
@@ -362,5 +378,4 @@ public class VendedorService {
 
         return valor;
     }
-
 }

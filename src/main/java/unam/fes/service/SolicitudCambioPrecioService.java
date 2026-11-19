@@ -10,6 +10,7 @@ import unam.fes.repository.SolicitudCambioPrecioRepository;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 
 @Service
@@ -102,8 +103,17 @@ public class SolicitudCambioPrecioService {
 
     public List<SolicitudCambioPrecio> listarSolicitudesPendientes() {
         return solicitudRepository.findByEstado(
-                SolicitudCambioPrecio.EstadoSolicitud.PENDIENTE
-        );
+                SolicitudCambioPrecio.EstadoSolicitud.PENDIENTE);
+    }
+
+    // Consultar todas las solicitudes para el administrador
+    public List<SolicitudCambioPrecio> listarTodasLasSolicitudes() {
+        return solicitudRepository.findAll()
+                .stream()
+                .sorted(Comparator.comparing(
+                        SolicitudCambioPrecio::getFechaSolicitud,
+                        Comparator.nullsLast(Comparator.reverseOrder())))
+                .toList();
     }
 
     @Transactional

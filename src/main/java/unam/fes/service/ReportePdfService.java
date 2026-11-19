@@ -8,10 +8,11 @@ import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
 import org.springframework.stereotype.Service;
+
 import unam.fes.entity.detalle.DetalleVenta;
 import unam.fes.entity.venta.Venta;
 
-import java.awt.*;
+import java.awt.Color;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -49,17 +50,19 @@ public class ReportePdfService {
     private static final DateTimeFormatter FORMATO_FECHA_HORA =
             DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
+    // =====================================================
+    // REPORTE DIARIO
+    // =====================================================
+
     public byte[] generarReporteDiario(
             LocalDate fecha,
-            java.util.List<Venta> ventas,
+            List<Venta> ventas,
             BigDecimal totalDia,
             Map<String, BigDecimal> ventasPorVendedor
     ) throws IOException {
 
         try (PDDocument documento = new PDDocument();
              ByteArrayOutputStream salida = new ByteArrayOutputStream()) {
-
-            Lienzo pdf = new Lienzo(documento);
 
             if (fecha == null) {
                 fecha = LocalDate.now();
@@ -77,14 +80,17 @@ public class ReportePdfService {
                 ventasPorVendedor = Map.of();
             }
 
-            // ENCABEZADO
+            Lienzo pdf = new Lienzo(
+                    documento,
+                    "ZACATLAN - REPORTE DIARIO DE VENTAS"
+            );
+
             pdf.texto("ZACATLAN", 45, 24, NEGRITA, AZUL);
             pdf.texto("REPORTE DIARIO DE VENTAS", 45, 13, NEGRITA, GRIS);
 
             pdf.y -= 8;
             pdf.linea();
 
-            // RESUMEN
             pdf.texto("RESUMEN DEL DIA", 45, 12, NEGRITA, AZUL);
 
             pdf.texto(
@@ -102,7 +108,6 @@ public class ReportePdfService {
                     formatoMoneda(totalDia)
             );
 
-            // VENTAS POR VENDEDOR
             pdf.espacio(55);
 
             pdf.texto("VENTAS POR VENDEDOR", 45, 12, NEGRITA, AZUL);
@@ -134,7 +139,6 @@ public class ReportePdfService {
                 }
             }
 
-            // DETALLE DE VENTAS
             pdf.espacio(60);
 
             pdf.y -= 8;
@@ -151,14 +155,11 @@ public class ReportePdfService {
             } else {
 
                 for (Venta venta : ventas) {
-
                     generarDetalleVenta(pdf, venta);
                 }
             }
 
-            // PIE DE PAGINA
             pdf.espacio(35);
-
             pdf.linea();
 
             pdf.texto(
@@ -173,14 +174,174 @@ public class ReportePdfService {
             );
 
             pdf.cerrar();
-
             documento.save(salida);
 
             return salida.toByteArray();
         }
     }
 
-    // GENERAR DETALLE DE UNA VENTA
+    // =====================================================
+    // REPORTE POR RANGO DE FECHAS
+    // =====================================================
+
+    public byte[] generarReportePorRango(
+            LocalDate fechaInicio,
+            LocalDate fechaFin,
+            List<Venta> ventas,
+            BigDecimal totalRango,
+            Map<String, BigDecimal> ventasPorVendedor
+    ) throws IOException {
+
+        try (PDDocument documento = new PDDocument();
+             ByteArrayOutputStream salida = new ByteArrayOutputStream()) {
+
+            if (fechaInicio == null || fechaFin == null) {
+                throw new IllegalArgumentException(
+                        "Debes indicar la fecha de inicio y la fecha de fin."
+                );
+            }
+
+            if (fechaInicio.isAfter(fechaFin)) {
+                throw new IllegalArgumentException(
+                        "La fecha de inicio no puede ser posterior a la fecha de fin."
+                );
+            }
+
+            if (ventas == null) {
+                ventas = new ArrayList<>();
+            }
+
+            if (totalRango == null) {
+                totalRango = BigDecimal.ZERO;
+            }
+
+            if (ventasPorVendedor == null) {
+                ventasPorVendedor = Map.of();
+            }
+
+            Lienzo pdf = new Lienzo(
+                    documento,
+                    "ZACATLAN - REPORTE POR RANGO DE FECHAS"
+            );
+
+            // ENCABEZADO
+
+            pdf.texto("ZACATLAN", 45, 24, NEGRITA, AZUL);
+
+            pdf.texto(
+                    "REPORTE DE VENTAS POR RANGO",
+                    45, 13, NEGRITA, GRIS
+            );
+
+            pdf.y -= 8;
+            pdf.linea();
+
+            // RESUMEN
+
+            pdf.texto("RESUMEN DEL PERIODO", 45, 12, NEGRITA, AZUL);
+
+            pdf.texto(
+                    "Fecha de inicio: " + fechaInicio.format(FORMATO_FECHA),
+                    45, 10, NORMAL, Color.BLACK
+            );
+
+            pdf.texto(
+                    "Fecha de fin: " + fechaFin.format(FORMATO_FECHA),
+                    45, 10, NORMAL, Color.BLACK
+            );
+
+            pdf.texto(
+                    "Cantidad de ventas: " + ventas.size(),
+                    45, 10, NORMAL, Color.BLACK
+            );
+
+            pdf.recuadroTotal(
+                    "TOTAL DEL PERIODO",
+                    formatoMoneda(totalRango)
+            );
+
+            // VENTAS POR VENDEDOR
+
+            pdf.espacio(55);
+
+            pdf.texto("VENTAS POR VENDEDOR", 45, 12, NEGRITA, AZUL);
+            pdf.linea();
+
+            if (ventasPorVendedor.isEmpty()) {
+
+                pdf.texto(
+                        "No hay ventas registradas en este periodo.",
+                        50, 10, NORMAL, GRIS
+                );
+
+            } else {
+
+                for (Map.Entry<String, BigDecimal> entrada :
+                        ventasPorVendedor.entrySet()) {
+
+                    pdf.espacio(20);
+
+                    pdf.texto(
+                            entrada.getKey(),
+                            50, 10, NORMAL, Color.BLACK
+                    );
+
+                    pdf.textoDerecha(
+                            formatoMoneda(entrada.getValue()),
+                            560, 10, NEGRITA, Color.BLACK
+                    );
+                }
+            }
+
+            // DETALLE DE VENTAS
+
+            pdf.espacio(60);
+
+            pdf.y -= 8;
+            pdf.texto("DETALLE DE VENTAS", 45, 14, NEGRITA, AZUL);
+            pdf.linea();
+
+            if (ventas.isEmpty()) {
+
+                pdf.texto(
+                        "No hay ventas registradas en este periodo.",
+                        50, 10, NORMAL, GRIS
+                );
+
+            } else {
+
+                for (Venta venta : ventas) {
+                    generarDetalleVenta(pdf, venta);
+                }
+            }
+
+            // PIE DE PAGINA
+
+            pdf.espacio(35);
+            pdf.linea();
+
+            pdf.texto(
+                    "Zacatlan - Sistema de administracion de ventas",
+                    45, 8, NORMAL, GRIS
+            );
+
+            pdf.textoDerecha(
+                    "Reporte generado: " +
+                            LocalDate.now().format(FORMATO_FECHA),
+                    560, 8, NORMAL, GRIS
+            );
+
+            pdf.cerrar();
+            documento.save(salida);
+
+            return salida.toByteArray();
+        }
+    }
+
+    // =====================================================
+    // DETALLE DE UNA VENTA
+    // =====================================================
+
     private void generarDetalleVenta(
             Lienzo pdf,
             Venta venta
@@ -192,7 +353,6 @@ public class ReportePdfService {
 
         pdf.espacio(125);
 
-        // ENCABEZADO DE LA VENTA
         pdf.recuadroEncabezado(
                 "VENTA #" + venta.getId()
         );
@@ -230,6 +390,7 @@ public class ReportePdfService {
         );
 
         // ENCABEZADOS DE LA TABLA
+
         pdf.espacio(40);
         pdf.fondoTabla();
 
@@ -242,7 +403,8 @@ public class ReportePdfService {
         pdf.linea();
 
         // PRODUCTOS DE LA VENTA
-        java.util.List<DetalleVenta> detalles = venta.getDetalles();
+
+        List<DetalleVenta> detalles = venta.getDetalles();
 
         if (detalles != null) {
 
@@ -264,7 +426,7 @@ public class ReportePdfService {
                     );
                 }
 
-                java.util.List<String> lineas = envolver(nombre, 42);
+                List<String> lineas = envolver(nombre, 42);
 
                 float altura = Math.max(16, lineas.size() * 10);
 
@@ -319,6 +481,7 @@ public class ReportePdfService {
         }
 
         // TOTAL DE LA VENTA
+
         pdf.espacio(30);
 
         pdf.textoDerecha(
@@ -331,7 +494,10 @@ public class ReportePdfService {
         pdf.linea();
     }
 
+    // =====================================================
     // FORMATO MONETARIO
+    // =====================================================
+
     private String formatoMoneda(BigDecimal cantidad) {
 
         if (cantidad == null) {
@@ -347,7 +513,10 @@ public class ReportePdfService {
         return "$" + formato.format(cantidad);
     }
 
+    // =====================================================
     // EVITAR VALORES DE TEXTO NULOS
+    // =====================================================
+
     private String valorTexto(String texto) {
 
         if (texto == null || texto.isBlank()) {
@@ -357,8 +526,11 @@ public class ReportePdfService {
         return texto;
     }
 
+    // =====================================================
     // DIVIDIR NOMBRES LARGOS EN VARIAS LINEAS
-    private java.util.List<String> envolver(String texto, int limite) {
+    // =====================================================
+
+    private List<String> envolver(String texto, int limite) {
 
         List<String> resultado = new ArrayList<>();
 
@@ -392,7 +564,10 @@ public class ReportePdfService {
         return resultado;
     }
 
+    // =====================================================
     // CONVERTIR TEXTO A CARACTERES COMPATIBLES CON HELVETICA
+    // =====================================================
+
     private String limpiarTexto(String texto) {
 
         if (texto == null) {
@@ -416,16 +591,25 @@ public class ReportePdfService {
                 .replace("‘", "'");
     }
 
+    // =====================================================
     // CONTROL DEL DOCUMENTO PDF
+    // =====================================================
+
     private class Lienzo {
 
         private final PDDocument documento;
+        private final String encabezadoPaginas;
         private PDPageContentStream contenido;
         private float y;
 
-        private Lienzo(PDDocument documento) throws IOException {
+        private Lienzo(
+                PDDocument documento,
+                String encabezadoPaginas
+        ) throws IOException {
 
             this.documento = documento;
+            this.encabezadoPaginas = encabezadoPaginas;
+
             nuevaPagina();
         }
 
@@ -445,7 +629,7 @@ public class ReportePdfService {
             if (documento.getNumberOfPages() > 1) {
 
                 escribir(
-                        "ZACATLAN - REPORTE DIARIO DE VENTAS",
+                        encabezadoPaginas,
                         45,
                         y,
                         11,

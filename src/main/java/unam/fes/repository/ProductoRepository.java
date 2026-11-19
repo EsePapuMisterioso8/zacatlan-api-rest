@@ -14,7 +14,16 @@ public interface ProductoRepository extends JpaRepository<Producto, Long> {
 
     List<Producto> findByBloqueIdAndActivoTrue(Long idBloque);
 
-    boolean existsByNombreIgnoreCaseAndBloqueId(String nombre, Long idBloque);
+    boolean existsByNombreIgnoreCaseAndBloqueId(
+            String nombre,
+            Long idBloque
+    );
+
+    boolean existsByNombreIgnoreCaseAndBloqueIdAndIdNot(
+            String nombre,
+            Long idBloque,
+            Long id
+    );
 
     boolean existsByBloqueId(Long idBloque);
 }

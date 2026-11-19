@@ -90,7 +90,6 @@ public class VentaService {
                 throw new IllegalArgumentException("Uno de los productos está inactivo.");
             }
 
-            // El vendedor puede cobrar cualquier precio, siempre que sea mayor que cero.
             BigDecimal precioFinal = item.getPrecioVenta() != null
                     ? item.getPrecioVenta()
                     : productoVendedor.getPrecio();
@@ -130,6 +129,20 @@ public class VentaService {
     // Todas las ventas
     public List<Venta> listarTodasLasVentas() {
         return ventaRepository.findAllByOrderByFechaHoraDesc();
+    }
+
+    // Obtiene los nombres de los productos de una venta.
+    @Transactional(readOnly = true)
+    public List<String> obtenerNombresProductos(Long idVenta) {
+
+        List<DetalleVenta> detalles = detalleVentaRepository.findByVentaId(idVenta);
+
+        return detalles.stream()
+                .map(detalle -> detalle.getProductoVendedor()
+                        .getProducto()
+                        .getNombre())
+                .distinct()
+                .toList();
     }
 
     // Detalle de una venta
@@ -175,6 +188,17 @@ public class VentaService {
                 );
     }
 
+    // Ventas de un vendedor en un día específico
+    public List<Venta> listarVentasVendedorPorDia(
+            Long idVendedor,
+            LocalDate fecha) {
+
+        return listarVentasPorDia(fecha)
+                .stream()
+                .filter(venta -> venta.getVendedor().getId().equals(idVendedor))
+                .toList();
+    }
+
     // Totales por vendedor en un día
     public Map<String, BigDecimal> calcularVentasPorVendedor(LocalDate fecha) {
 
@@ -203,6 +227,26 @@ public class VentaService {
                         inicio,
                         fin
                 );
+    }
+
+    // Totales por vendedor dentro de un rango de fechas
+    public Map<String, BigDecimal> calcularVentasPorVendedorEnRango(
+            LocalDate fechaInicio,
+            LocalDate fechaFin) {
+
+        List<Venta> ventas = listarVentasPorRango(fechaInicio, fechaFin);
+
+        Map<String, BigDecimal> totales = new LinkedHashMap<>();
+
+        for (Venta venta : ventas) {
+
+            Vendedor vendedor = venta.getVendedor();
+            String nombre = vendedor.getNombre() + " " + vendedor.getApellido();
+
+            totales.merge(nombre, venta.getTotal(), BigDecimal::add);
+        }
+
+        return totales;
     }
 
     // Ventas de un vendedor dentro de un rango de fechas

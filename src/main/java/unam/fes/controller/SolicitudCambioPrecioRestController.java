@@ -97,6 +97,18 @@ public class SolicitudCambioPrecioRestController {
         return new ResponseEntity<>(respuesta, HttpStatus.OK);
     }
 
+    // Consultar todas las solicitudes para el administrador
+    @GetMapping("/todas")
+    public ResponseEntity<List<SolicitudResponseDTO>> todasLasSolicitudes() {
+
+        List<SolicitudResponseDTO> respuesta =
+                solicitudService.listarTodasLasSolicitudes()
+                        .stream()
+                        .map(this::convertirADTO)
+                        .collect(Collectors.toList());
+
+        return new ResponseEntity<>(respuesta, HttpStatus.OK);
+    }
 
     @PutMapping("/{idSolicitud}/autorizar")
     public ResponseEntity<?> autorizar(

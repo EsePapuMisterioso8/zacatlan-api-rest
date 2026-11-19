@@ -28,6 +28,20 @@ public class VendedorRestController {
         );
     }
 
+    // Buscar vendedores aprobados por nombre o apellido
+    @GetMapping("/buscar")
+    public ResponseEntity<List<VendedorDTO>> buscarVendedores(
+            @RequestParam String texto) {
+
+        List<VendedorDTO> vendedores = vendedorService
+                .buscarVendedoresAprobadosPorNombre(texto)
+                .stream()
+                .map(this::convertirADTO)
+                .toList();
+
+        return ResponseEntity.ok(vendedores);
+    }
+
     // Consultar vendedores aprobados (solo administrador)
     @GetMapping
     public ResponseEntity<List<VendedorDTO>> listarVendedoresAprobados() {
@@ -35,28 +49,32 @@ public class VendedorRestController {
         List<VendedorDTO> vendedores = vendedorService
                 .listarVendedoresAprobados()
                 .stream()
-                .map(vendedor -> VendedorDTO.builder()
-                        .id(vendedor.getId())
-                        .nombre(vendedor.getNombre())
-                        .apellido(vendedor.getApellido())
-                        .username(
-                                vendedor.getUsuario() != null
-                                        ? vendedor.getUsuario().getUsername()
-                                        : vendedor.getUsernameSolicitado()
-                        )
-                        .telefono(vendedor.getTelefono())
-                        .nombreBloque(
-                                vendedor.getBloque() != null
-                                        ? vendedor.getBloque().getNombre()
-                                        : null
-                        )
-                        .estadoSolicitud(vendedor.getEstadoSolicitud())
-                        .activo(vendedor.getActivo())
-                        .build()
-                )
+                .map(this::convertirADTO)
                 .toList();
 
         return ResponseEntity.ok(vendedores);
+    }
+
+    // Convertir entidad a DTO
+    private VendedorDTO convertirADTO(unam.fes.entity.vendedor.Vendedor vendedor) {
+        return VendedorDTO.builder()
+                .id(vendedor.getId())
+                .nombre(vendedor.getNombre())
+                .apellido(vendedor.getApellido())
+                .username(
+                        vendedor.getUsuario() != null
+                                ? vendedor.getUsuario().getUsername()
+                                : vendedor.getUsernameSolicitado()
+                )
+                .telefono(vendedor.getTelefono())
+                .nombreBloque(
+                        vendedor.getBloque() != null
+                                ? vendedor.getBloque().getNombre()
+                                : null
+                )
+                .estadoSolicitud(vendedor.getEstadoSolicitud())
+                .activo(vendedor.getActivo())
+                .build();
     }
 
     // Registrar solicitud
