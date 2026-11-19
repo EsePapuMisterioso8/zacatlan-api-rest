@@ -24,17 +24,20 @@ public class VendedorService {
     private final BloqueRepository bloqueRepository;
     private final UsuarioRepository usuarioRepository;
     private final PasswordEncoder passwordEncoder;
+    private final HistorialMovimientosService historialService;
 
     public VendedorService(
             VendedorRepository vendedorRepository,
             BloqueRepository bloqueRepository,
             UsuarioRepository usuarioRepository,
-            PasswordEncoder passwordEncoder) {
+            PasswordEncoder passwordEncoder,
+            HistorialMovimientosService historialService) {
 
         this.vendedorRepository = vendedorRepository;
         this.bloqueRepository = bloqueRepository;
         this.usuarioRepository = usuarioRepository;
         this.passwordEncoder = passwordEncoder;
+        this.historialService = historialService;
     }
 
     @Transactional(readOnly = true)
@@ -50,7 +53,6 @@ public class VendedorService {
                 .toList();
     }
 
-    // Buscar vendedores aprobados por nombre o apellido
     @Transactional(readOnly = true)
     public List<Vendedor> buscarVendedoresAprobadosPorNombre(String texto) {
 
@@ -64,7 +66,8 @@ public class VendedorService {
         );
     }
 
-    // Registrar una solicitud de vendedor
+    // Registrar una solicitud pública de vendedor.
+    // No se registra en la bitácora porque todavía no interviene un administrador.
     @Transactional
     public Vendedor registrarSolicitud(
             String nombre,
@@ -158,7 +161,7 @@ public class VendedorService {
         return vendedorRepository.save(vendedor);
     }
 
-    // Validar textos personales
+    // Validar textos personales.
     private String validarTexto(
             String valor,
             String campo,
@@ -180,9 +183,11 @@ public class VendedorService {
         return valor;
     }
 
-    // Aprobar solicitud de vendedor
+    // Aprobar solicitud de vendedor.
     @Transactional
-    public Vendedor aprobarSolicitud(Long idVendedor) {
+    public Vendedor aprobarSolicitud(
+            Long idVendedor,
+            String usernameAdministrador) {
 
         Vendedor vendedor = vendedorRepository.findById(idVendedor)
                 .orElseThrow(() ->
@@ -209,6 +214,14 @@ public class VendedorService {
                     "El nombre de usuario ya está registrado");
         }
 
+        String datosAnteriores =
+                "Nombre: " + vendedor.getNombre()
+                        + ", Apellido: " + vendedor.getApellido()
+                        + ", Teléfono: " + vendedor.getTelefono()
+                        + ", Bloque: " + vendedor.getBloque().getNombre()
+                        + ", Usuario solicitado: " + username
+                        + ", Estado de solicitud: " + vendedor.getEstadoSolicitud();
+
         Usuario usuario = Usuario.builder()
                 .username(username)
                 .password(passwordCifrada)
@@ -227,12 +240,33 @@ public class VendedorService {
         vendedor.setUsernameSolicitado(null);
         vendedor.setPasswordSolicitado(null);
 
-        return vendedorRepository.save(vendedor);
+        Vendedor aprobado = vendedorRepository.save(vendedor);
+
+        historialService.registrarMovimiento(
+                usernameAdministrador,
+                "APROBAR",
+                "VENDEDOR",
+                aprobado.getId(),
+                "Se aprobó la solicitud y se creó el vendedor "
+                        + aprobado.getNombre() + " " + aprobado.getApellido(),
+                datosAnteriores,
+                "Nombre: " + aprobado.getNombre()
+                        + ", Apellido: " + aprobado.getApellido()
+                        + ", Teléfono: " + aprobado.getTelefono()
+                        + ", Bloque: " + aprobado.getBloque().getNombre()
+                        + ", Usuario: " + usuario.getUsername()
+                        + ", Estado: APROBADA"
+                        + ", Activo: true"
+        );
+
+        return aprobado;
     }
 
-    // Rechazar solicitud de vendedor
+    // Rechazar solicitud de vendedor.
     @Transactional
-    public Vendedor rechazarSolicitud(Long idVendedor) {
+    public Vendedor rechazarSolicitud(
+            Long idVendedor,
+            String usernameAdministrador) {
 
         Vendedor vendedor = vendedorRepository.findById(idVendedor)
                 .orElseThrow(() ->
@@ -244,22 +278,45 @@ public class VendedorService {
                     "Esta solicitud ya fue procesada");
         }
 
+        String datosAnteriores =
+                "Nombre: " + vendedor.getNombre()
+                        + ", Apellido: " + vendedor.getApellido()
+                        + ", Teléfono: " + vendedor.getTelefono()
+                        + ", Bloque: " + vendedor.getBloque().getNombre()
+                        + ", Usuario solicitado: " + vendedor.getUsernameSolicitado()
+                        + ", Estado de solicitud: " + vendedor.getEstadoSolicitud();
+
         vendedor.setEstadoSolicitud("RECHAZADA");
         vendedor.setActivo(false);
 
         vendedor.setUsernameSolicitado(null);
         vendedor.setPasswordSolicitado(null);
 
-        return vendedorRepository.save(vendedor);
+        Vendedor rechazado = vendedorRepository.save(vendedor);
+
+        historialService.registrarMovimiento(
+                usernameAdministrador,
+                "RECHAZAR",
+                "VENDEDOR",
+                rechazado.getId(),
+                "Se rechazó la solicitud del vendedor "
+                        + rechazado.getNombre() + " "
+                        + rechazado.getApellido(),
+                datosAnteriores,
+                "Estado de solicitud: RECHAZADA, Activo: false"
+        );
+
+        return rechazado;
     }
 
-    // Modificar datos personales del vendedor
+    // Modificar únicamente nombre, apellido y teléfono.
     @Transactional
     public Vendedor modificarDatosVendedor(
             Long idVendedor,
             String nombre,
             String apellido,
-            String telefono) {
+            String telefono,
+            String usernameAdministrador) {
 
         Vendedor vendedor = vendedorRepository.findById(idVendedor)
                 .orElseThrow(() ->
@@ -290,16 +347,39 @@ public class VendedorService {
                     "Ese número de teléfono ya está registrado por otro vendedor");
         }
 
+        String datosAnteriores =
+                "Nombre: " + vendedor.getNombre()
+                        + ", Apellido: " + vendedor.getApellido()
+                        + ", Teléfono: " + vendedor.getTelefono();
+
         vendedor.setNombre(nombre);
         vendedor.setApellido(apellido);
         vendedor.setTelefono(telefono);
 
-        return vendedorRepository.save(vendedor);
+        Vendedor actualizado = vendedorRepository.save(vendedor);
+
+        historialService.registrarMovimiento(
+                usernameAdministrador,
+                "MODIFICAR",
+                "VENDEDOR",
+                actualizado.getId(),
+                "Se modificaron los datos del vendedor "
+                        + actualizado.getNombre() + " "
+                        + actualizado.getApellido(),
+                datosAnteriores,
+                "Nombre: " + actualizado.getNombre()
+                        + ", Apellido: " + actualizado.getApellido()
+                        + ", Teléfono: " + actualizado.getTelefono()
+        );
+
+        return actualizado;
     }
 
-    // Desactivar vendedor
+    // Desactivar vendedor.
     @Transactional
-    public void desactivarVendedor(Long idVendedor) {
+    public void desactivarVendedor(
+            Long idVendedor,
+            String usernameAdministrador) {
 
         Vendedor vendedor = vendedorRepository.findById(idVendedor)
                 .orElseThrow(() ->
@@ -323,11 +403,25 @@ public class VendedorService {
         usuarioRepository.save(vendedor.getUsuario());
 
         vendedorRepository.save(vendedor);
+
+        historialService.registrarMovimiento(
+                usernameAdministrador,
+                "DESACTIVAR",
+                "VENDEDOR",
+                vendedor.getId(),
+                "Se desactivó el vendedor "
+                        + vendedor.getNombre() + " "
+                        + vendedor.getApellido(),
+                "Activo: true",
+                "Activo: false"
+        );
     }
 
-    // Activar vendedor
+    // Activar vendedor.
     @Transactional
-    public void activarVendedor(Long idVendedor) {
+    public void activarVendedor(
+            Long idVendedor,
+            String usernameAdministrador) {
 
         Vendedor vendedor = vendedorRepository.findById(idVendedor)
                 .orElseThrow(() ->
@@ -352,9 +446,21 @@ public class VendedorService {
         usuarioRepository.save(vendedor.getUsuario());
 
         vendedorRepository.save(vendedor);
+
+        historialService.registrarMovimiento(
+                usernameAdministrador,
+                "ACTIVAR",
+                "VENDEDOR",
+                vendedor.getId(),
+                "Se activó el vendedor "
+                        + vendedor.getNombre() + " "
+                        + vendedor.getApellido(),
+                "Activo: false",
+                "Activo: true"
+        );
     }
 
-    // Validar nombres y apellidos
+    // Validar nombres y apellidos.
     private String validarNombre(String valor, String campo) {
 
         if (valor == null || valor.isBlank()) {

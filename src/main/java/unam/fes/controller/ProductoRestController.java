@@ -4,9 +4,11 @@ package unam.fes.controller;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
 import unam.fes.entity.producto.Producto;
 import unam.fes.service.ProductoService;
 
+import java.security.Principal;
 import java.util.List;
 import java.util.Map;
 
@@ -51,7 +53,8 @@ public class ProductoRestController {
 
     @PostMapping
     public ResponseEntity<String> registrarProducto(
-            @RequestBody Producto producto) {
+            @RequestBody Producto producto,
+            Principal principal) {
         try {
             String nombre = producto.getNombre();
             String descripcion = producto.getDescripcion();
@@ -60,7 +63,8 @@ public class ProductoRestController {
             productoService.registrarProducto(
                     nombre,
                     descripcion,
-                    idBloque
+                    idBloque,
+                    principal.getName()
             );
 
             return new ResponseEntity<>(
@@ -80,7 +84,8 @@ public class ProductoRestController {
     @PutMapping("/{id}")
     public ResponseEntity<String> actualizarProducto(
             @PathVariable Long id,
-            @RequestBody Map<String, Object> datos) {
+            @RequestBody Map<String, Object> datos,
+            Principal principal) {
         try {
             String nombre = (String) datos.get("nombre");
             String descripcion = (String) datos.get("descripcion");
@@ -88,7 +93,8 @@ public class ProductoRestController {
             productoService.actualizarProducto(
                     id,
                     nombre,
-                    descripcion
+                    descripcion,
+                    principal.getName()
             );
 
             return new ResponseEntity<>(
@@ -105,9 +111,14 @@ public class ProductoRestController {
     }
 
     @PutMapping("/{id}/estado")
-    public ResponseEntity<String> cambiarEstado(@PathVariable Long id) {
+    public ResponseEntity<String> cambiarEstado(
+            @PathVariable Long id,
+            Principal principal) {
         try {
-            productoService.cambiarEstadoProducto(id);
+            productoService.cambiarEstadoProducto(
+                    id,
+                    principal.getName()
+            );
 
             return new ResponseEntity<>(
                     "Estado del producto invertido exitosamente",

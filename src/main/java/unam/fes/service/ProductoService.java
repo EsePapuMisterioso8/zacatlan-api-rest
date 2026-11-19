@@ -15,12 +15,15 @@ public class ProductoService {
 
     private final ProductoRepository productoRepository;
     private final BloqueRepository bloqueRepository;
+    private final HistorialMovimientosService historialService;
 
     public ProductoService(
             ProductoRepository productoRepository,
-            BloqueRepository bloqueRepository) {
+            BloqueRepository bloqueRepository,
+            HistorialMovimientosService historialService) {
         this.productoRepository = productoRepository;
         this.bloqueRepository = bloqueRepository;
+        this.historialService = historialService;
     }
 
     public List<Producto> listarProductos() {
@@ -33,14 +36,16 @@ public class ProductoService {
 
     public Producto obtenerProductoPorId(Long idProducto) {
         return productoRepository.findById(idProducto)
-                .orElseThrow(() -> new IllegalArgumentException(
-                        "No se encontró el producto"));
+                .orElseThrow(() ->
+                        new IllegalArgumentException("No se encontró el producto"));
     }
 
+    @Transactional
     public Producto registrarProducto(
             String nombre,
             String descripcion,
-            Long idBloque) {
+            Long idBloque,
+            String usernameAdministrador) {
 
         if (nombre == null || nombre.isBlank()) {
             throw new IllegalArgumentException(
@@ -48,8 +53,9 @@ public class ProductoService {
         }
 
         Bloque bloque = bloqueRepository.findById(idBloque)
-                .orElseThrow(() -> new IllegalArgumentException(
-                        "No se encontró el bloque seleccionado"));
+                .orElseThrow(() ->
+                        new IllegalArgumentException(
+                                "No se encontró el bloque seleccionado"));
 
         if (!bloque.getActivo()) {
             throw new IllegalArgumentException(
@@ -71,14 +77,30 @@ public class ProductoService {
                 .activo(true)
                 .build();
 
-        return productoRepository.save(producto);
+        Producto guardado = productoRepository.save(producto);
+
+        historialService.registrarMovimiento(
+                usernameAdministrador,
+                "CREAR",
+                "PRODUCTO",
+                guardado.getId(),
+                "Se creó el producto " + guardado.getNombre(),
+                null,
+                "Nombre: " + guardado.getNombre()
+                        + ", Descripción: " + guardado.getDescripcion()
+                        + ", Bloque: " + bloque.getNombre()
+                        + ", Activo: true"
+        );
+
+        return guardado;
     }
 
     @Transactional
     public Producto actualizarProducto(
             Long idProducto,
             String nombre,
-            String descripcion) {
+            String descripcion,
+            String usernameAdministrador) {
 
         if (nombre == null || nombre.isBlank()) {
             throw new IllegalArgumentException(
@@ -86,8 +108,9 @@ public class ProductoService {
         }
 
         Producto producto = productoRepository.findById(idProducto)
-                .orElseThrow(() -> new IllegalArgumentException(
-                        "No se encontró el producto"));
+                .orElseThrow(() ->
+                        new IllegalArgumentException(
+                                "No se encontró el producto"));
 
         nombre = nombre.trim();
 
@@ -99,21 +122,62 @@ public class ProductoService {
                     "Ya existe un producto con ese nombre en el bloque");
         }
 
+        String datosAnteriores =
+                "Nombre: " + producto.getNombre()
+                        + ", Descripción: " + producto.getDescripcion()
+                        + ", Bloque: " + producto.getBloque().getNombre()
+                        + ", Activo: " + producto.getActivo();
+
         producto.setNombre(nombre);
         producto.setDescripcion(descripcion);
 
-        return productoRepository.save(producto);
+        Producto actualizado = productoRepository.save(producto);
+
+        String datosNuevos =
+                "Nombre: " + actualizado.getNombre()
+                        + ", Descripción: " + actualizado.getDescripcion()
+                        + ", Bloque: " + actualizado.getBloque().getNombre()
+                        + ", Activo: " + actualizado.getActivo();
+
+        historialService.registrarMovimiento(
+                usernameAdministrador,
+                "MODIFICAR",
+                "PRODUCTO",
+                actualizado.getId(),
+                "Se modificó el producto " + actualizado.getNombre(),
+                datosAnteriores,
+                datosNuevos
+        );
+
+        return actualizado;
     }
 
     @Transactional
-    public void cambiarEstadoProducto(Long idProducto) {
+    public void cambiarEstadoProducto(
+            Long idProducto,
+            String usernameAdministrador) {
 
         Producto producto = productoRepository.findById(idProducto)
-                .orElseThrow(() -> new IllegalArgumentException(
-                        "No se encontró el producto"));
+                .orElseThrow(() ->
+                        new IllegalArgumentException(
+                                "No se encontró el producto"));
 
-        producto.setActivo(!producto.getActivo());
+        boolean estadoAnterior = Boolean.TRUE.equals(producto.getActivo());
+        boolean nuevoEstado = !estadoAnterior;
 
+        producto.setActivo(nuevoEstado);
         productoRepository.save(producto);
+
+        historialService.registrarMovimiento(
+                usernameAdministrador,
+                nuevoEstado ? "ACTIVAR" : "DESACTIVAR",
+                "PRODUCTO",
+                producto.getId(),
+                (nuevoEstado ? "Se activó el producto "
+                        : "Se desactivó el producto ")
+                        + producto.getNombre(),
+                "Activo: " + estadoAnterior,
+                "Activo: " + nuevoEstado
+        );
     }
 }
